@@ -54,7 +54,8 @@ runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **an
       user's `CLAUDE_CODE_AUTO_COMPACT_WINDOW` if set, else the model's real window, else a
       `200000` floor. README documents how (and why) to set it yourself.
 - [x] **Public or private?** _(2026-07-02)_ Resolved: **public**, under Apache 2.0.
-- [ ] Nice-to-have now that it's public: add a screenshot/GIF of the gauge to the README.
+- [x] Add a hero banner to the README (`assets/clepsydre-banner.png`, pixel-art). _(2026-07-02)_
+- [ ] Nice-to-have: add a real screenshot/GIF of the gauge in action to the README.
 
 ## Reminders
 - Brand name stays French ("Clepsydre"); everything else in English.

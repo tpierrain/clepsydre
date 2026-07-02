@@ -1,8 +1,8 @@
 # macOS
 .DS_Store
 
-# Backups made by install.sh
+# Backups made by install.mjs
 *.bak.*
 
-# jq merge temp
-*.tmp
+# Node deps (none required, but just in case)
+node_modules/

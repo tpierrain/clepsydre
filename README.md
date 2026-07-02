@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/clepsydre-banner.png" alt="Clepsydre — a Fort Boyard–style pixel-art water clock overwhelmed by a Caribbean wave, with the tagline 'The tokens are rising — get out fast before the stupidity zone locks you in.'" width="100%">
+</p>
+
 # 🏺 Clepsydre
 
 > **The water's rising — get out before the door locks.**
