@@ -33,9 +33,9 @@ runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **an
 
 ### To do — GitHub remote
 - [x] Add an Apache 2.0 `LICENSE` (public, open source). _(2026-07-02)_
-- [ ] Create the remote (public) and wire it:
-  - [ ] `gh repo create tpierrain/clepsydre --public --source=. --remote=origin`
-  - [ ] `git push -u origin main`
+- [x] Create the remote (public) and wire it: _(2026-07-02)_
+  - [x] `gh repo create tpierrain/clepsydre --public --source=. --remote=origin`
+  - [x] `git push -u origin main` — https://github.com/tpierrain/clepsydre
 
 ### To do — install & verify (this Mac)
 - [ ] `node install.mjs --check`, then `node install.mjs`.
