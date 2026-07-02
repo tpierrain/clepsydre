@@ -91,11 +91,24 @@ bloating and rotting context. The 🧩→⚠️→🧨 tiers catch exactly that.
 
 ## Install
 
+### The easy way — let Claude do it
+
+You're already in the Claude Code CLI, so let it install Clepsydre for you. Paste this to
+Claude:
+
+> **Install Clepsydre on my machine by following its README:
+> https://github.com/tpierrain/clepsydre**
+
+It clones the repo, runs the installer, and tells you to restart Claude Code. (It may ask
+where to clone — anywhere stable is fine.)
+
+### The manual way
+
 Works the same on **macOS, Linux and Windows** — it's plain Node.js, and any machine that
 runs Claude Code already has Node.
 
 ```bash
-git clone <your-remote> ~/Dev/clepsydre
+git clone https://github.com/tpierrain/clepsydre.git ~/Dev/clepsydre
 cd ~/Dev/clepsydre
 node install.mjs          # or node install.mjs --check for a dry-run
 ```
