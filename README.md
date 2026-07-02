@@ -4,7 +4,7 @@
 
 # 🏺 Clepsydre
 
-> **The water's rising — get out before the door locks.**
+> **The tokens are rising — get out fast before the stupidity zone locks you in.**
 
 A Fort Boyard–style water clock for your Claude Code context window — `/clear` before
 you're trapped in the context-rot room.
