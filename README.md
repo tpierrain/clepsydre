@@ -33,6 +33,16 @@ context rot (the "stupidity zone").
 - **Memory weight** — size of `MEMORY.md` (reloaded in full every session) and the memory folder:
   - 🧩 green < 15K · ⚠️ orange 15–25K · 🧨 red ≥ 25K
 
+### Live, in Claude Code
+
+Plenty of headroom — 🧠 green, you're fine:
+
+![Clepsydre status line, green tier: 129.6k/400.0k (32%)](assets/statusline-green.png)
+
+Deep in the stupidity zone — 🤪 bold red, `/clear` now:
+
+![Clepsydre status line, red tier: 244.6k/400.0k (61%)](assets/statusline-red.png)
+
 ## Install
 
 Works the same on **macOS, Linux and Windows** — it's plain Node.js, and any machine

@@ -55,7 +55,7 @@ runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **an
       `200000` floor. README documents how (and why) to set it yourself.
 - [x] **Public or private?** _(2026-07-02)_ Resolved: **public**, under Apache 2.0.
 - [x] Add a hero banner to the README (`assets/clepsydre-banner.png`, pixel-art). _(2026-07-02)_
-- [ ] Nice-to-have: add a real screenshot/GIF of the gauge in action to the README.
+- [x] Add real screenshots of the gauge in action (green + red tiers) to the README. _(2026-07-02)_
 
 ## Reminders
 - Brand name stays French ("Clepsydre"); everything else in English.
