@@ -26,19 +26,21 @@ export function fmtBytes(b) {
   return b + 'B';
 }
 
-// Token segment tier by the anti-context-rot thresholds: 🧠 green < 150k,
-// ⚠️ orange 150k–200k, 🤪 bold-red >= 200k (the "stupidity zone").
-export function tokenTier(used) {
-  if (used >= 200000) return { icon: '🤪', color: '\x1b[1;31m' };
-  if (used >= 150000) return { icon: '⚠️ ', color: '\x1b[33m' };
+// Token segment tier by the anti-context-rot thresholds: 🧠 green < warn,
+// ⚠️ orange warn–crazy, 🤪 bold-red >= crazy (the "stupidity zone"). The thresholds
+// default to 150k/200k but the caller can override them (see resolveThresholds).
+export function tokenTier(used, { warn = 150000, crazy = 200000 } = {}) {
+  if (used >= crazy) return { icon: '🤪', color: '\x1b[1;31m' };
+  if (used >= warn) return { icon: '⚠️ ', color: '\x1b[33m' };
   return { icon: '🧠', color: '\x1b[32m' };
 }
 
-// MEMORY.md tier — reloaded IN FULL every session (~25 KB budget): 🧩 green < 15K,
-// ⚠️ orange 15K–25K, 🧨 bold-red >= 25K.
-export function memTier(mdBytes) {
-  if (mdBytes >= 25600) return { icon: '🧨', color: '\x1b[1;31m' };
-  if (mdBytes >= 15360) return { icon: '⚠️ ', color: '\x1b[33m' };
+// MEMORY.md tier — reloaded IN FULL every session (~25 KB budget): 🧩 green < warn,
+// ⚠️ orange warn–rot, 🧨 bold-red >= rot. Thresholds default to 15K/25K but the caller
+// can override them (see resolveThresholds).
+export function memTier(mdBytes, { warn = 15360, rot = 25600 } = {}) {
+  if (mdBytes >= rot) return { icon: '🧨', color: '\x1b[1;31m' };
+  if (mdBytes >= warn) return { icon: '⚠️ ', color: '\x1b[33m' };
   return { icon: '🧩', color: '\x1b[32m' };
 }
 
@@ -48,6 +50,30 @@ export function memTier(mdBytes) {
 export function resolveMax(envRaw, contextWindowSize) {
   if (envRaw !== undefined && envRaw !== null && envRaw !== '') return Number(envRaw);
   return contextWindowSize ?? 200000;
+}
+
+// Resolve the four color thresholds from the environment, falling back to the built-in
+// defaults. Returns { token: { warn, crazy }, mem: { warn, rot } } to hand straight to
+// tokenTier / memTier.
+export function resolveThresholds(env = {}) {
+  const num = (raw, fallback) => {
+    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+  };
+  // A pair is only accepted when its lower tier is strictly below its upper tier;
+  // otherwise the whole pair reverts to defaults (a half-inverted pair makes no sense).
+  const pair = (lowKey, lowDef, highKey, highDef) => {
+    const low = num(env[lowKey], lowDef);
+    const high = num(env[highKey], highDef);
+    return low < high ? [low, high] : [lowDef, highDef];
+  };
+  const [tWarn, tCrazy] = pair('CLEPSYDRE_TOKEN_WARN', 150000, 'CLEPSYDRE_TOKEN_CRAZY', 200000);
+  const [mWarn, mRot] = pair('CLEPSYDRE_MEM_WARN', 15360, 'CLEPSYDRE_MEM_ROT', 25600);
+  return {
+    token: { warn: tWarn, crazy: tCrazy },
+    mem: { warn: mWarn, rot: mRot },
+  };
 }
 
 // Integer percentage of the working window used, truncated (bash `USED*100/MAX`).
@@ -60,14 +86,15 @@ const RESET = '\x1b[0m';
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
 // fs or git here). `mem` is null when there is no project memory folder, otherwise
 // { mdBytes, dirBytes, fileCount }. Mirrors the bash assembly order and separators.
-export function buildStatusLine({ model, basename, branch, used, max, mem }) {
-  const tier = tokenTier(used);
+export function buildStatusLine({ model, basename, branch, used, max, mem, thresholds }) {
+  const t = thresholds ?? resolveThresholds();
+  const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
   let out = `[${model}] 📁 ${basename}`;
   if (branch) out += ` ⎇ ${branch}`;
   out += ` · ${tok}`;
   if (mem) {
-    const m = memTier(mem.mdBytes);
+    const m = memTier(mem.mdBytes, t.mem);
     out += ` · ${m.color}${m.icon} MEMORY.md ${fmtBytes(mem.mdBytes)}` +
       ` · mem ${fmtBytes(mem.dirBytes)}/${mem.fileCount}f${RESET}`;
   }
@@ -145,6 +172,7 @@ export function main() {
     used,
     max,
     mem,
+    thresholds: resolveThresholds(process.env),
   });
   process.stdout.write(line + '\n');
 }

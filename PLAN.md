@@ -100,7 +100,34 @@ the pixel-art hero banner and the two live screenshots (green/red tiers).
         - "Des pointeurs, pas des copies, banane" —
           https://medium.com/@tpierrain/des-pointeurs-pas-des-copies-banane-56c9d197b80b
 
-- [x] Commit + push when done. _(2026-07-02)_
+- [x] Commit + push when done. _(2026-07-02 · f84f320)_
+
+### To do — configurable color thresholds (env vars)
+Rationale _(2026-07-02)_: changing a color threshold is **configuration, not code**. Today the
+tiers are hard-coded in `clepsydre.mjs`, so the only way to change them is editing a
+**versioned, shared** file (pollutes the repo, risks `git pull` conflicts). Expose them as env
+vars read from `settings.json` — current values as defaults, so out-of-the-box behavior is
+unchanged. Global via `~/.claude/settings.json`; **per-project override** via
+`<project>/.claude/settings.json` (Claude Code precedence: project > user). Names are frozen:
+
+| Env var | Default | Tier |
+| --- | --- | --- |
+| `CLEPSYDRE_TOKEN_WARN` | `150000` | ⚠️ |
+| `CLEPSYDRE_TOKEN_CRAZY` | `200000` | 🤪 |
+| `CLEPSYDRE_MEM_WARN` | `15360` | ⚠️ |
+| `CLEPSYDRE_MEM_ROT` | `25600` | 🧨 |
+
+- [x] TDD `tokenTier(used, thresholds)` — takes `{warn, crazy}`, defaults `150000`/`200000`. _(2026-07-02)_
+- [x] TDD `memTier(bytes, thresholds)` — takes `{warn, rot}`, defaults `15360`/`25600`. _(2026-07-02)_
+- [x] `resolveThresholds(env)` (TDD): reads the four env vars, ignores non-numeric /
+      non-positive / empty values, and reverts a pair to its defaults when `warn` isn't
+      strictly below `crazy`/`rot`. _(2026-07-02)_
+- [x] Wire `main()` + `buildStatusLine` to resolve the env vars once and pass them into the
+      tier helpers. _(2026-07-02)_
+- [x] README: "Customize the color thresholds" section — table (var · default · icon),
+      global vs per-project, defaults reproduce today's behavior. Fixed the Update table. _(2026-07-02)_
+- [x] Moved the test suite to `test/clepsydre.test.mjs` (leaner root; `node --test` finds it). _(2026-07-02)_
+- [ ] Tests green (39) + commit + push.
 
 ### To do — install & verify (this Mac)
 - [ ] `node install.mjs --check`, then `node install.mjs`.

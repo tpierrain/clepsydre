@@ -7,8 +7,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   fmtTokens, fmtBytes, tokenTier, memTier, resolveMax, pct, buildStatusLine,
-  computeMemDir, readMemory,
-} from './clepsydre.mjs';
+  computeMemDir, readMemory, resolveThresholds,
+} from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
 const ORANGE = '\x1b[33m';
@@ -59,6 +59,13 @@ test('tokenTier: from 200k it is the bold-red stupidity zone', () => {
   assert.deepEqual(tokenTier(200000), { icon: '🤪', color: BOLD_RED });
 });
 
+test('tokenTier: custom thresholds override the defaults (crazy at 300k)', () => {
+  const thresholds = { warn: 250000, crazy: 300000 };
+  assert.deepEqual(tokenTier(200000, thresholds), { icon: '🧠', color: GREEN });
+  assert.deepEqual(tokenTier(250000, thresholds), { icon: '⚠️ ', color: ORANGE });
+  assert.deepEqual(tokenTier(300000, thresholds), { icon: '🤪', color: BOLD_RED });
+});
+
 test('memTier: below 15K is the green puzzle piece', () => {
   assert.deepEqual(memTier(4300), { icon: '🧩', color: GREEN });
 });
@@ -69,6 +76,65 @@ test('memTier: from 15K (15360 bytes) it is the orange warning', () => {
 
 test('memTier: from 25K (25600 bytes) it is the bold-red dynamite', () => {
   assert.deepEqual(memTier(25600), { icon: '🧨', color: BOLD_RED });
+});
+
+test('memTier: custom thresholds override the defaults (rot at 40K)', () => {
+  const thresholds = { warn: 20480, rot: 40960 };
+  assert.deepEqual(memTier(15360, thresholds), { icon: '🧩', color: GREEN });
+  assert.deepEqual(memTier(20480, thresholds), { icon: '⚠️ ', color: ORANGE });
+  assert.deepEqual(memTier(40960, thresholds), { icon: '🧨', color: BOLD_RED });
+});
+
+test('resolveThresholds: an empty env yields the built-in defaults', () => {
+  assert.deepEqual(resolveThresholds({}), {
+    token: { warn: 150000, crazy: 200000 },
+    mem: { warn: 15360, rot: 25600 },
+  });
+});
+
+test('resolveThresholds: the four env vars override their defaults', () => {
+  const env = {
+    CLEPSYDRE_TOKEN_WARN: '120000',
+    CLEPSYDRE_TOKEN_CRAZY: '180000',
+    CLEPSYDRE_MEM_WARN: '10240',
+    CLEPSYDRE_MEM_ROT: '20480',
+  };
+  assert.deepEqual(resolveThresholds(env), {
+    token: { warn: 120000, crazy: 180000 },
+    mem: { warn: 10240, rot: 20480 },
+  });
+});
+
+test('resolveThresholds: empty, non-numeric or non-positive values fall back to defaults', () => {
+  const env = {
+    CLEPSYDRE_TOKEN_WARN: '', // empty -> default, not 0
+    CLEPSYDRE_TOKEN_CRAZY: 'lots', // garbage -> default
+    CLEPSYDRE_MEM_WARN: '0', // non-positive -> default
+    CLEPSYDRE_MEM_ROT: '-5', // negative -> default
+  };
+  assert.deepEqual(resolveThresholds(env), {
+    token: { warn: 150000, crazy: 200000 },
+    mem: { warn: 15360, rot: 25600 },
+  });
+});
+
+test('resolveThresholds: an inverted token pair (warn >= crazy) falls back to token defaults', () => {
+  const env = { CLEPSYDRE_TOKEN_WARN: '200000', CLEPSYDRE_TOKEN_CRAZY: '180000' };
+  const resolved = resolveThresholds(env);
+  assert.deepEqual(resolved.token, { warn: 150000, crazy: 200000 });
+});
+
+test('resolveThresholds: an inverted mem pair falls back to mem defaults, token pair untouched', () => {
+  const env = {
+    CLEPSYDRE_TOKEN_WARN: '120000',
+    CLEPSYDRE_TOKEN_CRAZY: '180000',
+    CLEPSYDRE_MEM_WARN: '30000', // warn >= rot -> inverted
+    CLEPSYDRE_MEM_ROT: '20480',
+  };
+  assert.deepEqual(resolveThresholds(env), {
+    token: { warn: 120000, crazy: 180000 },
+    mem: { warn: 15360, rot: 25600 },
+  });
 });
 
 test('resolveMax: the user CLAUDE_CODE_AUTO_COMPACT_WINDOW wins when set', () => {
@@ -124,6 +190,16 @@ test('buildStatusLine: a memory folder appends the colored MEMORY.md weight segm
   );
 });
 
+test('buildStatusLine: honors custom thresholds for the token gauge color', () => {
+  // 180k would be orange under the defaults; with a higher warn it stays green.
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'p', branch: '',
+    used: 180000, max: 400000, mem: null,
+    thresholds: { token: { warn: 190000, crazy: 250000 }, mem: { warn: 15360, rot: 25600 } },
+  });
+  assert.equal(line, `[Opus 4.8] 📁 p · ${GREEN}🧠 180.0k/400.0k (45%)${RESET}`);
+});
+
 test('computeMemDir: prefers the transcript path (memory folder next to it)', () => {
   const dir = computeMemDir('/u/x/.claude/projects/abc/t.jsonl', '/any/cwd', '/home');
   assert.equal(dir, path.join('/u/x/.claude/projects/abc', 'memory'));
@@ -164,8 +240,32 @@ test('readMemory: a folder without any *.md yields null', () => {
   assert.equal(readMemory(d), null);
 });
 
+test('end-to-end: CLEPSYDRE_* env vars retune the token tier color', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 180000, total_output_tokens: 0, context_window_size: 400000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: {
+      ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '',
+      CLEPSYDRE_TOKEN_WARN: '190000', CLEPSYDRE_TOKEN_CRAZY: '250000',
+    },
+  });
+  // 180k would be orange under the defaults; the raised warn keeps it green.
+  assert.equal(
+    out,
+    `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 180.0k/400.0k (45%)${RESET}\n`,
+  );
+});
+
 test('end-to-end: piping Claude Code JSON prints the composed status line', () => {
-  const script = fileURLToPath(new URL('./clepsydre.mjs', import.meta.url));
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-')); // not a git repo
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-')); // no memory folder
   const payload = JSON.stringify({

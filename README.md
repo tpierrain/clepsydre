@@ -96,11 +96,15 @@ bloating and rotting context. The 🧩→⚠️→🧨 tiers catch exactly that.
 You're already in the Claude Code CLI, so let it install Clepsydre for you. Paste this to
 Claude:
 
-> **Install Clepsydre on my machine by following its README:
-> https://github.com/tpierrain/clepsydre**
+> **Install Clepsydre on my machine by following its README
+> (https://github.com/tpierrain/clepsydre). Before touching anything, explain to me what
+> you're going to do and where — which files you'll create or change — then wait for my
+> go-ahead.**
 
-It clones the repo, runs the installer, and tells you to restart Claude Code. (It may ask
-where to clone — anywhere stable is fine.)
+Claude first walks you through the plan (clone the repo, then merge a `statusLine` entry
+into `~/.claude/settings.json` after backing it up). Once you approve, it runs the
+installer and tells you to restart Claude Code. (It may ask where to clone — anywhere
+stable is fine.)
 
 ### The manual way
 
@@ -125,9 +129,10 @@ Restart Claude Code to see it.
 Because the status line runs this repo's file directly, `git pull` is enough for script
 changes — no re-install, on any OS.
 
-| You change… | Where you edit | On the other machine |
+| You change… | Where you set it | On the other machine |
 | --- | --- | --- |
-| **the gauge** (colors, thresholds, format) | edit `clepsydre.mjs` → `git commit && git push` | `git pull` — done |
+| **the color thresholds** (when 🧠→⚠️→🤪 and 🧩→⚠️→🧨 kick in) | your own `settings.json` — the `CLEPSYDRE_*` env vars (see [Customize the color thresholds](#customize-the-color-thresholds)) | nothing — it's your local config, per machine or per project |
+| **the gauge itself** (format, logic, new segments) | edit `clepsydre.mjs` → `git commit && git push` | `git pull` — done |
 | **where it lives** (moved the repo) | — | `git pull` then `node install.mjs` (rewrites the path) |
 
 ## The working window
@@ -158,6 +163,39 @@ choice, so Clepsydre leaves it to you. Add it to your own `~/.claude/settings.js
 
 Rule of thumb (my own): for coding I don't go past ~230k tokens; quality is meant to hold
 up to roughly 300–400k. Pick what fits your context — Clepsydre will show it.
+
+## Customize the color thresholds
+
+The tier colors flip at sensible defaults, but **changing a threshold is configuration,
+not code** — so you set it in your own `settings.json`, never by editing `clepsydre.mjs`
+(that file stays identical for everyone, so `git pull` keeps working). Four optional env
+vars, each defaulting to today's behavior:
+
+| Env var | Default | Tier it moves |
+| --- | --- | --- |
+| `CLEPSYDRE_TOKEN_WARN` | `150000` | 🧠 → ⚠️ (ease off) |
+| `CLEPSYDRE_TOKEN_CRAZY` | `200000` | ⚠️ → 🤪 (stupidity zone) |
+| `CLEPSYDRE_MEM_WARN` | `15360` | 🧩 → ⚠️ (`MEMORY.md`, bytes) |
+| `CLEPSYDRE_MEM_ROT` | `25600` | ⚠️ → 🧨 (`MEMORY.md`, bytes) |
+
+**Where to set them:**
+
+- **Everywhere on this machine** → your global `~/.claude/settings.json`.
+- **For one project only** → that project's `.claude/settings.json` (Claude Code gives the
+  project file precedence over the global one).
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_TOKEN_WARN": "180000",
+    "CLEPSYDRE_TOKEN_CRAZY": "250000"
+  }
+}
+```
+
+Set only the ones you care about; the rest keep their defaults. Anything empty,
+non-numeric, or non-positive is ignored, and a pair whose `WARN` isn't below its
+`CRAZY`/`ROT` quietly reverts to its defaults — a bad value can never break the gauge.
 
 ## Requirements
 
