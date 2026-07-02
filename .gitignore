@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Backups made by install.sh
+*.bak.*
+
+# jq merge temp
+*.tmp
