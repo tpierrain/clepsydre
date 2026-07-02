@@ -18,6 +18,8 @@ context is, so you can `/clear` at exactly the right moment.
 > time (`/clear`), you stay stuck in the context-rot room. Clepsydre is your "get out in
 > time" signal.
 
+**[Install Clepsydre now →](#install)**
+
 ## The problem
 
 In the Claude Code CLI, context engineering has a blind spot: the window fills up turn
