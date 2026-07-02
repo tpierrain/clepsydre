@@ -98,10 +98,12 @@ bloating and rotting context. The 🧩→⚠️→🧨 tiers catch exactly that.
 You're already in the Claude Code CLI, so let it install Clepsydre for you. Paste this to
 Claude:
 
-> **Install Clepsydre on my machine by following its README
-> (https://github.com/tpierrain/clepsydre). Before touching anything, explain to me what
-> you're going to do and where — which files you'll create or change — then wait for my
-> go-ahead.**
+```text
+Install Clepsydre on my machine by following its README
+(https://github.com/tpierrain/clepsydre). Before touching anything, explain to me
+what you're going to do and where — which files you'll create or change — then wait
+for my go-ahead.
+```
 
 Claude first walks you through the plan (clone the repo, then merge a `statusLine` entry
 into `~/.claude/settings.json` after backing it up). Once you approve, it runs the
