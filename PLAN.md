@@ -37,6 +37,35 @@ runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **an
   - [x] `gh repo create tpierrain/clepsydre --public --source=. --remote=origin`
   - [x] `git push -u origin main` — https://github.com/tpierrain/clepsydre
 
+### NEXT — README marketing pass (do this first)
+Wear a **marketing-lead hat**: turn the README into something **very readable, short but
+crystal-clear** — a reader should grasp *what it does*, *what pain it kills*, and *why they
+want it* in ~15 seconds. Keep the brand French ("Clepsydre"); everything else English. Keep
+the pixel-art hero banner and the two live screenshots (green/red tiers).
+
+- [ ] **Lead with the problem, then the product** (value prop before feature list).
+- [ ] **Nail the core promise:** a *passive, always-on* context-window gauge for
+      **context engineering** — you see your budget at a glance, every turn, without asking.
+- [ ] **Name the pains it removes** (this is the marketing spine):
+  - [ ] No more hammering `/context` to check where you stand — those calls are **painful
+        (huge call-stack height once MCPs are loaded)** and **waste time**. Clepsydre shows
+        it passively, always.
+  - [ ] **See overflow coming in real time** on *two* fronts, so you can **prepare a `/clear`
+        at the right moment** (not too early, not in the stupidity zone):
+    - [ ] the **context window** filling up (🧠→⚠️→🤪 token tiers);
+    - [ ] **memory-side context rot** — `MEMORY.md` is reloaded *in full every session*, so
+          when it bloats it silently rots context. Concrete trigger to cite: forgetting to
+          tell your harness that `MEMORY.md` must hold **pointers to the plan**, so it
+          **re-copies the whole plan** every time you ask "can I `/clear`?" → the 🧩→⚠️→🧨
+          memory tiers catch exactly that.
+- [ ] **Tighten ruthlessly:** short sentences, scannable, no redundancy. Cut/compress the
+      current long "Why Clepsydre?" and "working window" prose; keep a crisp version.
+- [ ] **Structure suggestion:** hero → one-line promise → "The problem" (2–3 bullets) →
+      "What you see" (screenshots) → Install → deeper docs (working window) lower down.
+- [ ] Preserve the accurate technical facts (Node-only, Mac+Windows, no jq/bc, user owns the
+      working-window value). Marketing ≠ overclaiming.
+- [ ] Commit + push when done.
+
 ### To do — install & verify (this Mac)
 - [ ] `node install.mjs --check`, then `node install.mjs`.
 - [ ] Restart Claude Code and confirm the gauge shows (🧠/⚠️/🤪 token tier + 🧩 `MEMORY.md`).
