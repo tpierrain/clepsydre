@@ -1,7 +1,7 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline-command.sh",
+    "command": "node ~/Dev/clepsydre/clepsydre.mjs",
     "padding": 2
   }
 }

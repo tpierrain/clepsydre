@@ -10,25 +10,42 @@ and note _(date · commit)_ when a step ships.
 - [x] Repo scaffolded in `~/Dev/clepsydre`: `statusline-command.sh` (English comments,
       logic byte-for-byte identical to the original), `clepsydre.settings.json`,
       `install.sh`, `README.md`, `.gitignore`, `CLAUDE.md`, `PLAN.md`.
-- [x] `git init -b main` (branch `main`, not `master`). **Nothing committed yet — on purpose.**
+- [x] `git init -b main` (branch `main`, not `master`).
+- [x] First commit on `main` — bash version preserved in history. _(2026-07-02 · be9c3e3)_
 
-### To do — first commit & GitHub remote
-- [ ] First commit on `main` (suggested message below).
-- [ ] Create the GitHub remote and wire it:
+### To do — cross-platform Node port (Mac + Windows)
+Decision _(2026-07-02)_: rewrite everything in **Node.js** (guaranteed present — Claude Code
+runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **and** Windows.
+- [x] Port the status line to `clepsydre.mjs` (TDD, iso-behaviour with the bash: same
+      150k/200k token tiers & icons 🧠/⚠️/🤪, same 15K/25K memory tiers 🧩/⚠️/🧨, k/M
+      token format base 1000, byte format base 1024, same denominator fallbacks). _(2026-07-02)_
+  - [x] Pure helpers unit-tested with `node:test` (fmt tokens, fmt bytes, token tier,
+        memory tier, resolve working-window, pct, compose line). 30 tests green.
+  - [x] Thin `main`: read stdin JSON, resolve git branch + memory sizes, print the line
+        (covered by an end-to-end test + manual smoke tests).
+- [x] Point the `statusLine` at `clepsydre.mjs` — the installer writes an absolute path
+      to this repo's script (no symlink, no `~` expansion → Windows-safe). _(2026-07-02)_
+- [x] Port the installer to `install.mjs` (pure Node merge of `settings.json`, no `jq`,
+      timestamped backup, `--check` dry-run). Cross-platform paths. _(2026-07-02)_
+- [x] Delete `statusline-command.sh` and `install.sh` (recoverable at be9c3e3). _(2026-07-02)_
+- [x] Update `README.md` (Node requirement, no jq/bc, Windows notes). _(2026-07-02)_
+- [ ] Commit the Node port.
+
+### To do — GitHub remote
+- [ ] Create the remote and wire it:
   - [ ] `gh repo create tpierrain/clepsydre --private --source=. --remote=origin` (or via the web UI)
   - [ ] `git push -u origin main`
 
 ### To do — install & verify (this Mac)
-- [ ] `./install.sh --check`, then `./install.sh` (symlinks the script + merges the settings fragment).
+- [ ] `node install.mjs --check`, then `node install.mjs`.
 - [ ] Restart Claude Code and confirm the gauge shows (🧠/⚠️/🤪 token tier + 🧩 `MEMORY.md`).
-- [ ] Confirm the original `~/.claude/statusline-command.sh` was backed up to `.bak.<stamp>`
-      and is now a symlink into this repo.
+- [ ] Note: the old `~/.claude/statusline-command.sh` (bash) is simply no longer referenced
+      once `settings.json` points at `clepsydre.mjs` — remove it by hand if you like.
 
-### To do — the other Mac
-- [ ] `brew install jq` if missing.
+### To do — the other machines (Mac + Windows)
 - [ ] `git clone git@github.com:tpierrain/clepsydre.git ~/Dev/clepsydre`
-- [ ] `cd ~/Dev/clepsydre && ./install.sh`
-- [ ] Restart Claude Code and confirm.
+- [ ] `cd ~/Dev/clepsydre && node install.mjs`
+- [ ] Restart Claude Code and confirm (Windows included — Node only, no jq/bc).
 
 ### Decisions / open points
 - [x] **Working-window value.** _(2026-07-02)_ Resolved: Clepsydre does **not** pick a
@@ -37,18 +54,6 @@ and note _(date · commit)_ when a step ships.
       `200000` floor. README documents how (and why) to set it yourself.
 - [ ] **Public or private?** It's a brand ("Clepsydre"). If it goes public later: add a
       LICENSE and a screenshot/GIF of the gauge in the README.
-
-## Suggested first commit message (English)
-
-```
-feat: initial Clepsydre — context-window status line for Claude Code
-
-Status line that shows live token usage against the working window, with
-anti-context-rot color thresholds, plus MEMORY.md weight. Ships the script,
-a settings fragment, and an idempotent install.sh (symlink + jq merge).
-
-Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-```
 
 ## Reminders
 - Brand name stays French ("Clepsydre"); everything else in English.

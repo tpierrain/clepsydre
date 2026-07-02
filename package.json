@@ -1,0 +1,14 @@
+{
+  "name": "clepsydre",
+  "version": "1.0.0",
+  "description": "A context-window status line for Claude Code — the water's rising, /clear before you're locked in.",
+  "type": "module",
+  "bin": {
+    "clepsydre": "clepsydre.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "install-statusline": "node install.mjs"
+  },
+  "license": "MIT"
+}

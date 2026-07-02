@@ -28,27 +28,31 @@ context rot (the "stupidity zone").
 
 ## Install
 
+Works the same on **macOS, Linux and Windows** — it's plain Node.js, and any machine
+that runs Claude Code already has Node.
+
 ```bash
 git clone <your-remote> ~/Dev/clepsydre
 cd ~/Dev/clepsydre
-./install.sh          # or ./install.sh --check for a dry-run
+node install.mjs          # or node install.mjs --check for a dry-run
 ```
 
-`install.sh` is idempotent. It:
-
-1. checks dependencies (`jq` required, `bc` recommended — both `brew install`-able),
-2. symlinks `~/.claude/statusline-command.sh` to this repo,
-3. merges `clepsydre.settings.json` into `~/.claude/settings.json` (a timestamped
-   `.bak` is made first; your other settings are preserved).
+`install.mjs` is idempotent and touches only `~/.claude/settings.json`. It points your
+Claude Code `statusLine` at this repo's `clepsydre.mjs` (absolute path — no symlink, no
+`~` expansion, so it's Windows-safe), after making a timestamped `.bak` of your
+settings. Your other settings are preserved.
 
 Restart Claude Code to see it.
 
 ## Update
 
+Because the status line runs this repo's file directly, `git pull` is enough for script
+changes — no re-install, on any OS.
+
 | You change… | Where you edit | On the other machine |
 | --- | --- | --- |
-| **the script** (colors, thresholds, format) | edit in place → `git commit && git push` | `git pull` — done (it's symlinked) |
-| **a settings block** (env, padding) | edit `clepsydre.settings.json` → commit/push | `git pull` then `./install.sh` (idempotent re-merge) |
+| **the gauge** (colors, thresholds, format) | edit `clepsydre.mjs` → `git commit && git push` | `git pull` — done |
+| **where it lives** (moved the repo) | — | `git pull` then `node install.mjs` (rewrites the path) |
 
 ## The working window
 
@@ -82,5 +86,8 @@ hold up to roughly 300–400k. Pick what fits your context — Clepsydre will sh
 
 ## Requirements
 
-- macOS (bash + native `bc`), `jq`, `git`.
-- The status line keeps working outside git repos — the branch segment just disappears.
+- **Node.js** — already present on any machine running Claude Code (that's what it runs
+  on). No `jq`, no `bc`, no bash.
+- `git` is optional: the status line keeps working outside a repo — the branch segment
+  just disappears.
+- macOS, Linux and Windows.
