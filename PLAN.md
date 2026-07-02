@@ -127,7 +127,7 @@ unchanged. Global via `~/.claude/settings.json`; **per-project override** via
 - [x] README: "Customize the color thresholds" section — table (var · default · icon),
       global vs per-project, defaults reproduce today's behavior. Fixed the Update table. _(2026-07-02)_
 - [x] Moved the test suite to `test/clepsydre.test.mjs` (leaner root; `node --test` finds it). _(2026-07-02)_
-- [ ] Tests green (39) + commit + push.
+- [x] Tests green (39) + commit + push. _(2026-07-02 · 2797e47)_
 
 ### To do — install & verify (this Mac)
 - [ ] `node install.mjs --check`, then `node install.mjs`.
