@@ -69,10 +69,10 @@ the pixel-art hero banner and the two live screenshots (green/red tiers).
       stays crisp: distil this into a tight "Why it matters" block, don't paste it wholesale.
   - [ ] **Context degrades as it inflates (context rot).** Performance drops as the context
         grows — the agent forgets, confuses, hallucinates.
-  - [ ] **Positional vs size.** The old "info in the middle is read worse" curve (the
-        historical sense of *Lost in the Middle*, Liu et al. 2023 —
-        https://arxiv.org/abs/2307.03172) is **largely mitigated on frontier models**. What
-        stays **true and measured** is degradation tied to context **size**.
+  - [ ] **It's about size, not position.** The old "info in the middle is read worse"
+        (positional) effect is **outdated on frontier models — do NOT cite it** (no
+        *Lost in the Middle*). What stays **true and measured** today is degradation tied to
+        context **size**.
         🖼️ *(place @Josian Chevalier's "perf ↓ vs context size" diagram here.)*
   - [ ] **The stupidity zone — empirical, ~150K–200K.** Not exact science, model-dependent,
         opinions differ; but heavy users find that past ~150–200K it starts to misbehave →
