@@ -84,8 +84,10 @@ export function pct(used, max) {
 const RESET = '\x1b[0m';
 
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
-// fs or git here). `mem` is null when there is no project memory folder, otherwise
-// { mdBytes, dirBytes, fileCount }. Mirrors the bash assembly order and separators.
+// fs or git here). `mem` is { mdBytes, dirBytes, fileCount } — the live path always
+// passes one (readMemory returns zeros for an empty/absent folder, so the segment is
+// always shown). A null `mem` omits the segment: a convenience for focused unit tests
+// that don't care about memory. Mirrors the bash assembly order and separators.
 export function buildStatusLine({ model, basename, branch, used, max, mem, thresholds }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
@@ -110,18 +112,23 @@ export function computeMemDir(transcriptPath, dir, home) {
   return path.join(home, '.claude', 'projects', enc, 'memory');
 }
 
+// An empty memory folder — no MEMORY.md, no *.md. The segment is still rendered
+// (as "🧩 MEMORY.md 0B · mem 0B/0f"), so the status line never looks "wrong" or
+// half-installed just because a project has no memories yet.
+const EMPTY_MEM = { mdBytes: 0, dirBytes: 0, fileCount: 0 };
+
 // Read the memory folder's weight: MEMORY.md size (reloaded in full each session),
-// total bytes of every *.md, and the file count. Returns null when the folder is
-// absent or holds no *.md — the caller then drops the memory segment entirely.
+// total bytes of every *.md, and the file count. Returns EMPTY_MEM (all zeros) when
+// the folder is absent or holds no *.md — the segment is always shown, empty.
 export function readMemory(memDir) {
   let entries;
   try {
     entries = fs.readdirSync(memDir);
   } catch {
-    return null; // folder absent or unreadable
+    return EMPTY_MEM; // folder absent or unreadable — still shown, at zero
   }
   const mdFiles = entries.filter((f) => f.endsWith('.md'));
-  if (mdFiles.length === 0) return null;
+  if (mdFiles.length === 0) return EMPTY_MEM; // folder exists but empty — shown at zero
 
   const sizeOf = (f) => {
     try {

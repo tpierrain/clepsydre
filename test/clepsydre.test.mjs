@@ -221,9 +221,9 @@ test('computeMemDir: also folds Windows path separators and colons to "-"', () =
   );
 });
 
-test('readMemory: a missing folder yields null', () => {
+test('readMemory: a missing folder yields zeros (the segment is still shown, empty)', () => {
   const missing = path.join(os.tmpdir(), 'clepsydre-no-such-dir-xyz');
-  assert.equal(readMemory(missing), null);
+  assert.deepEqual(readMemory(missing), { mdBytes: 0, dirBytes: 0, fileCount: 0 });
 });
 
 test('readMemory: sums MEMORY.md and every *.md, and counts the files', () => {
@@ -234,10 +234,10 @@ test('readMemory: sums MEMORY.md and every *.md, and counts the files', () => {
   assert.deepEqual(readMemory(d), { mdBytes: 3, dirBytes: 5, fileCount: 2 });
 });
 
-test('readMemory: a folder without any *.md yields null', () => {
+test('readMemory: a folder without any *.md yields zeros (the segment is still shown, empty)', () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-empty-'));
   fs.writeFileSync(path.join(d, 'notes.txt'), 'x');
-  assert.equal(readMemory(d), null);
+  assert.deepEqual(readMemory(d), { mdBytes: 0, dirBytes: 0, fileCount: 0 });
 });
 
 test('end-to-end: CLEPSYDRE_* env vars retune the token tier color', () => {
@@ -258,9 +258,11 @@ test('end-to-end: CLEPSYDRE_* env vars retune the token tier color', () => {
     },
   });
   // 180k would be orange under the defaults; the raised warn keeps it green.
+  // The work dir has no memory folder, so the segment is shown empty (0B/0f).
   assert.equal(
     out,
-    `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 180.0k/400.0k (45%)${RESET}\n`,
+    `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 180.0k/400.0k (45%)${RESET}` +
+      ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}\n`,
   );
 });
 
@@ -278,8 +280,10 @@ test('end-to-end: piping Claude Code JSON prints the composed status line', () =
     encoding: 'utf8',
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
   });
+  // No memory folder here, so the segment is shown empty (0B/0f) rather than dropped.
   assert.equal(
     out,
-    `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 65.3k/1.0M (6%)${RESET}\n`,
+    `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 65.3k/1.0M (6%)${RESET}` +
+      ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}\n`,
   );
 });
