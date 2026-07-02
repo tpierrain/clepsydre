@@ -29,11 +29,12 @@ runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **an
       timestamped backup, `--check` dry-run). Cross-platform paths. _(2026-07-02)_
 - [x] Delete `statusline-command.sh` and `install.sh` (recoverable at be9c3e3). _(2026-07-02)_
 - [x] Update `README.md` (Node requirement, no jq/bc, Windows notes). _(2026-07-02)_
-- [ ] Commit the Node port.
+- [x] Commit the Node port. _(2026-07-02 · 378a656)_
 
 ### To do — GitHub remote
-- [ ] Create the remote and wire it:
-  - [ ] `gh repo create tpierrain/clepsydre --private --source=. --remote=origin` (or via the web UI)
+- [x] Add an Apache 2.0 `LICENSE` (public, open source). _(2026-07-02)_
+- [ ] Create the remote (public) and wire it:
+  - [ ] `gh repo create tpierrain/clepsydre --public --source=. --remote=origin`
   - [ ] `git push -u origin main`
 
 ### To do — install & verify (this Mac)
@@ -52,8 +53,8 @@ runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **an
       value. The `env` block was removed from `clepsydre.settings.json`; the gauge reads the
       user's `CLAUDE_CODE_AUTO_COMPACT_WINDOW` if set, else the model's real window, else a
       `200000` floor. README documents how (and why) to set it yourself.
-- [ ] **Public or private?** It's a brand ("Clepsydre"). If it goes public later: add a
-      LICENSE and a screenshot/GIF of the gauge in the README.
+- [x] **Public or private?** _(2026-07-02)_ Resolved: **public**, under Apache 2.0.
+- [ ] Nice-to-have now that it's public: add a screenshot/GIF of the gauge to the README.
 
 ## Reminders
 - Brand name stays French ("Clepsydre"); everything else in English.

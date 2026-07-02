@@ -10,5 +10,5 @@
     "test": "node --test",
     "install-statusline": "node install.mjs"
   },
-  "license": "MIT"
+  "license": "Apache-2.0"
 }
