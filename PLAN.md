@@ -64,6 +64,42 @@ the pixel-art hero banner and the two live screenshots (green/red tiers).
       "What you see" (screenshots) → Install → deeper docs (working window) lower down.
 - [ ] Preserve the accurate technical facts (Node-only, Mac+Windows, no jq/bc, user owns the
       working-window value). Marketing ≠ overclaiming.
+
+- [ ] **Weave in the "why" — substance to synthesize (short, marketed, English).** The README
+      stays crisp: distil this into a tight "Why it matters" block, don't paste it wholesale.
+  - [ ] **Context degrades as it inflates (context rot).** Performance drops as the context
+        grows — the agent forgets, confuses, hallucinates.
+  - [ ] **Positional vs size.** The old "info in the middle is read worse" curve (the
+        historical sense of *Lost in the Middle*, Liu et al. 2023 —
+        https://arxiv.org/abs/2307.03172) is **largely mitigated on frontier models**. What
+        stays **true and measured** is degradation tied to context **size**.
+        🖼️ *(place @Josian Chevalier's "perf ↓ vs context size" diagram here.)*
+  - [ ] **The stupidity zone — empirical, ~150K–200K.** Not exact science, model-dependent,
+        opinions differ; but heavy users find that past ~150–200K it starts to misbehave →
+        `/clear` often. Caveat: recent measurements (**Chroma "Context Rot" report** —
+        https://research.trychroma.com/context-rot) put clear degradation nearer ~300–400K on
+        1M models; ~150–200K is a prudent **comfort zone** for reliable coding, not a hard
+        break point.
+  - [ ] **The 1M-window trap.** Anthropic shipped 1M context to analyse **big documents**
+        without auto-compacting from the start — **not** to code inside it. Because you *can*
+        doesn't mean you *should*: stay under ~150–200K, flee context rot, don't enter the
+        stupidity zone.
+  - [ ] **Compaction as a guardrail — but the timing trap is the punchline.** Unguarded
+        auto-compaction, **especially on 1M windows, fires far too late** — when you're
+        already deep in the stupidity zone. So the summary that seeds every later turn is
+        written by "someone drunk, tired, hallucinating": your whole subsequent working
+        context is generated from a degraded state → compounding harm. Clepsydre's value:
+        **see it coming and `/clear` at the *right* time**, before auto-compaction saves you
+        too late.
+  - [ ] **Tie back to the memory tier.** Keep `MEMORY.md` lean — **pointers, not copies** —
+        or it rots context (reloaded in full every session). 🧩→⚠️→🧨 catches exactly this.
+  - [ ] **Reuse Thomas's own explanations/tone (French articles — synthesize, keep README
+        English):**
+        - "Comment éviter de devenir zinzin (votre IA, et vous un peu aussi)" —
+          https://medium.com/@tpierrain/comment-%C3%A9viter-de-devenir-zinzin-votre-ia-et-vous-un-peu-aussi-a704af30455a
+        - "Des pointeurs, pas des copies, banane" —
+          https://medium.com/@tpierrain/des-pointeurs-pas-des-copies-banane-56c9d197b80b
+
 - [ ] Commit + push when done.
 
 ### To do — install & verify (this Mac)
