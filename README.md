@@ -6,9 +6,11 @@
 
 > **The tokens are rising — get out fast before the stupidity zone locks you in.**
 
-**A passive, always-on gauge for your Claude Code context window.** It lives in your
-status line and shows — every turn, without you asking — how full your context is, so
-you can `/clear` at exactly the right moment.
+**A passive, always-on gauge for your context window, built for the Claude Code CLI.** It
+lives in your status line and shows — every turn, without you asking — how full your
+context is, so you can `/clear` at exactly the right moment.
+
+![Clepsydre status line, red tier: 244.6k/400.0k (61%)](assets/statusline-red.png)
 
 > **Why "Clepsydre"?** A *clepsydra* is a water clock. In *Fort Boyard*, it slowly fills
 > the room until the door locks and you're trapped — *"Sors ! Sors ! Sors !"*. Your
@@ -18,7 +20,8 @@ you can `/clear` at exactly the right moment.
 
 ## The problem
 
-Context engineering has a blind spot: **you can't steer what you can't see.**
+In the Claude Code CLI, context engineering has a blind spot: the window fills up turn
+after turn, but nothing shows it passively — and **you can't steer what you can't see.**
 
 - **Checking costs you.** Hammering `/context` to find where you stand wastes time — and
   once MCP servers are loaded, each call carries a huge call stack. Clepsydre shows it
@@ -148,3 +151,6 @@ up to roughly 300–400k. Pick what fits your context — Clepsydre will show it
 - `git` is optional: the status line keeps working outside a repo — the branch segment
   just disappears.
 - macOS, Linux and Windows.
+- **Claude Code CLI only.** Clepsydre plugs into the CLI's status line. The **Claude
+  Desktop** app doesn't work like that — it has its own context-management mechanisms and
+  no status line to hook into — so Clepsydre doesn't apply there (for now).
