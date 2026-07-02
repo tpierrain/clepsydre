@@ -100,24 +100,28 @@ Claude:
 
 ```text
 Install Clepsydre on my machine by following its README
-(https://github.com/tpierrain/clepsydre). Before touching anything, explain to me
-what you're going to do and where — which files you'll create or change — then wait
-for my go-ahead.
+(https://github.com/tpierrain/clepsydre). First ask me which directory to clone it
+into, suggesting my home directory (e.g. ~/clepsydre) as the default. Then, before
+touching anything, explain what you're going to do and where — which files you'll
+create or change — and wait for my go-ahead.
 ```
 
-Claude first walks you through the plan (clone the repo, then merge a `statusLine` entry
+Claude asks **where** to clone it (your home directory, e.g. `~/clepsydre`, is a safe
+default), then walks you through the plan (clone the repo, then merge a `statusLine` entry
 into `~/.claude/settings.json` after backing it up). Once you approve, it runs the
-installer and tells you to restart Claude Code. (It may ask where to clone — anywhere
-stable is fine.)
+installer and tells you to restart Claude Code.
 
 ### The manual way
 
 Works the same on **macOS, Linux and Windows** — it's plain Node.js, and any machine that
 runs Claude Code already has Node.
 
+Clone it wherever you like — pick a **stable** spot, since the status line runs from
+there. Your home directory is a safe default (avoid a folder you might move or wipe):
+
 ```bash
-git clone https://github.com/tpierrain/clepsydre.git ~/Dev/clepsydre
-cd ~/Dev/clepsydre
+git clone https://github.com/tpierrain/clepsydre.git ~/clepsydre
+cd ~/clepsydre
 node install.mjs          # or node install.mjs --check for a dry-run
 ```
 

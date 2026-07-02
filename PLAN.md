@@ -136,8 +136,9 @@ unchanged. Global via `~/.claude/settings.json`; **per-project override** via
       once `settings.json` points at `clepsydre.mjs` — remove it by hand if you like.
 
 ### To do — the other machines (Mac + Windows)
-- [ ] `git clone git@github.com:tpierrain/clepsydre.git ~/Dev/clepsydre`
-- [ ] `cd ~/Dev/clepsydre && node install.mjs`
+- [ ] `git clone git@github.com:tpierrain/clepsydre.git ~/clepsydre` (home by default —
+      avoid `~/Dev/clepsydre`, which collides with the dev checkout on this Mac)
+- [ ] `cd ~/clepsydre && node install.mjs`
 - [ ] Restart Claude Code and confirm (Windows included — Node only, no jq/bc).
 
 ### Decisions / open points
