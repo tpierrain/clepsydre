@@ -71,7 +71,9 @@ nearer ~300–400K on 1M models, so ~150–200K stays conservative for reliable 
 auto-compacting from the start — *not* to code inside all of it. Because you *can* doesn't
 mean you *should*: stay under ~150–200K and flee the stupidity zone.
 
-**Why timing beats compaction.** Auto-compaction is a guardrail — but left unguarded,
+## Why timing beats compaction
+
+Auto-compaction is a guardrail — but left unguarded,
 **especially on 1M windows, it fires far too late**, when you're already deep in the
 stupidity zone. The summary that then seeds every later turn is written by "someone drunk,
 tired, hallucinating," and your whole subsequent working context inherits that degraded
