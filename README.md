@@ -1,6 +1,9 @@
 # 🏺 Clepsydre
 
-**A context-window gauge for Claude Code.** The water's rising — `/clear` before you're locked in.
+> **The water's rising — get out before the door locks.**
+
+A Fort Boyard–style water clock for your Claude Code context window — `/clear` before
+you're trapped in the context-rot room.
 
 Clepsydre lives in your status line and shows, at every turn, how full your context
 window is — with color thresholds that tell you to get out *before* you drift into

@@ -1,7 +1,7 @@
 {
   "name": "clepsydre",
   "version": "1.0.0",
-  "description": "A context-window status line for Claude Code — the water's rising, /clear before you're locked in.",
+  "description": "A Fort Boyard–style water clock for your Claude Code context window — /clear before you're trapped in the context-rot room.",
   "type": "module",
   "bin": {
     "clepsydre": "clepsydre.mjs"
