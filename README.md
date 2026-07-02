@@ -6,20 +6,30 @@
 
 > **The tokens are rising — get out fast before the stupidity zone locks you in.**
 
-A Fort Boyard–style water clock for your Claude Code context window — `/clear` before
-you're trapped in the context-rot room.
+**A passive, always-on gauge for your Claude Code context window.** It lives in your
+status line and shows — every turn, without you asking — how full your context is, so
+you can `/clear` at exactly the right moment.
 
-Clepsydre lives in your status line and shows, at every turn, how full your context
-window is — with color thresholds that tell you to get out *before* you drift into
-context rot (the "stupidity zone").
+> **Why "Clepsydre"?** A *clepsydra* is a water clock. In *Fort Boyard*, it slowly fills
+> the room until the door locks and you're trapped — *"Sors ! Sors ! Sors !"*. Your
+> context window works the same way: it fills with tokens, and if you don't step out in
+> time (`/clear`), you stay stuck in the context-rot room. Clepsydre is your "get out in
+> time" signal.
 
-> **Why "Clepsydre"?** A *clepsydra* is a water clock. In the French TV game *Fort
-> Boyard*, a clepsydra slowly fills the room: when it's full, the door locks and you
-> are trapped — *"Sors ! Sors ! Sors !"*. Your context window works the same way. It
-> fills with tokens, and if you don't step out in time (`/clear`), you stay stuck in
-> the context-rot room. Clepsydre is your "get out in time" signal.
+## The problem
 
-## What it shows
+Context engineering has a blind spot: **you can't steer what you can't see.**
+
+- **Checking costs you.** Hammering `/context` to find where you stand wastes time — and
+  once MCP servers are loaded, each call carries a huge call stack. Clepsydre shows it
+  passively, always. No call needed.
+- **Overflow builds silently, on two fronts.** Your context window fills with tokens
+  (🧠→⚠️→🤪) *and* `MEMORY.md` — reloaded in full every session — quietly bloats and rots
+  your context (🧩→⚠️→🧨). Clepsydre watches both, so you see it coming.
+- **The right moment is narrow.** `/clear` too early and you throw away useful context;
+  too late and you're already stupid. A live gauge lets you time it.
+
+## What you see
 
 ```
 [Opus 4.8] 📁 my-project ⎇ main · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
@@ -33,8 +43,6 @@ context rot (the "stupidity zone").
 - **Memory weight** — size of `MEMORY.md` (reloaded in full every session) and the memory folder:
   - 🧩 green < 15K · ⚠️ orange 15–25K · 🧨 red ≥ 25K
 
-### Live, in Claude Code
-
 Plenty of headroom — 🧠 green, you're fine:
 
 ![Clepsydre status line, green tier: 129.6k/400.0k (32%)](assets/statusline-green.png)
@@ -43,10 +51,43 @@ Deep in the stupidity zone — 🤪 bold red, `/clear` now:
 
 ![Clepsydre status line, red tier: 244.6k/400.0k (61%)](assets/statusline-red.png)
 
+## Why it matters
+
+Context doesn't just fill — it **degrades as it fills** (*context rot*). As the context
+grows, the agent forgets, confuses, and hallucinates more. This is about **size, not
+position**: the old "info in the middle gets read worse" effect is outdated on frontier
+models — what stays measured today is degradation tied to context **size**.
+
+**Where the trouble starts (~150–200K).** It's not exact science — it's model-dependent
+and opinions differ — but heavy users find that past ~150–200K tokens, coding quality
+starts to slip. Treat it as a prudent comfort zone, not a hard wall. (Chroma's
+[Context Rot report](https://research.trychroma.com/context-rot) puts *clear* degradation
+nearer ~300–400K on 1M models, so ~150–200K stays conservative for reliable coding.)
+
+**The 1M-window trap.** Anthropic shipped 1M context to analyse **big documents** without
+auto-compacting from the start — *not* to code inside all of it. Because you *can* doesn't
+mean you *should*: stay under ~150–200K and flee the stupidity zone.
+
+**Why timing beats compaction.** Auto-compaction is a guardrail — but left unguarded,
+**especially on 1M windows, it fires far too late**, when you're already deep in the
+stupidity zone. The summary that then seeds every later turn is written by "someone drunk,
+tired, hallucinating," and your whole subsequent working context inherits that degraded
+state — compounding harm. Clepsydre's value: **see it coming and `/clear` at the *right*
+time**, before auto-compaction rescues you too late.
+
+**Keep memory lean — pointers, not copies.** `MEMORY.md` is reloaded in full every
+session. Forget to tell your harness to store *pointers to the plan* rather than the plan
+itself, and it will re-paste the whole thing every time you ask "can I `/clear`?" —
+bloating and rotting context. The 🧩→⚠️→🧨 tiers catch exactly that.
+
+> More, in Thomas's own words (French): *["Comment éviter de devenir zinzin (votre IA, et
+> vous un peu aussi)"](https://medium.com/@tpierrain/comment-%C3%A9viter-de-devenir-zinzin-votre-ia-et-vous-un-peu-aussi-a704af30455a)*
+> and *["Des pointeurs, pas des copies, banane"](https://medium.com/@tpierrain/des-pointeurs-pas-des-copies-banane-56c9d197b80b)*.
+
 ## Install
 
-Works the same on **macOS, Linux and Windows** — it's plain Node.js, and any machine
-that runs Claude Code already has Node.
+Works the same on **macOS, Linux and Windows** — it's plain Node.js, and any machine that
+runs Claude Code already has Node.
 
 ```bash
 git clone <your-remote> ~/Dev/clepsydre
@@ -56,8 +97,8 @@ node install.mjs          # or node install.mjs --check for a dry-run
 
 `install.mjs` is idempotent and touches only `~/.claude/settings.json`. It points your
 Claude Code `statusLine` at this repo's `clepsydre.mjs` (absolute path — no symlink, no
-`~` expansion, so it's Windows-safe), after making a timestamped `.bak` of your
-settings. Your other settings are preserved.
+`~` expansion, so it's Windows-safe), after making a timestamped `.bak` of your settings.
+Your other settings are preserved.
 
 Restart Claude Code to see it.
 
@@ -76,19 +117,18 @@ changes — no re-install, on any OS.
 The gauge's denominator is **your** working window — Clepsydre never picks it for you:
 
 1. if you've set `CLAUDE_CODE_AUTO_COMPACT_WINDOW`, the gauge uses that value;
-2. otherwise it falls back to the model's real window reported by Claude Code (e.g. 1M
-   on Opus 4.8 1M);
+2. otherwise it falls back to the model's real window reported by Claude Code (e.g. 1M on
+   Opus 4.8 1M);
 3. as a last resort (field absent), it floors at `200000`.
 
-So out of the box the gauge just tracks your real model window — no opinion imposed,
-and **no change to when auto-compaction fires**.
+So out of the box the gauge just tracks your real model window — no opinion imposed, and
+**no change to when auto-compaction fires**.
 
 ### Want a tighter working window?
 
 `CLAUDE_CODE_AUTO_COMPACT_WINDOW` is a real Claude Code setting: it controls **when
-auto-compaction triggers**, not just what this gauge displays. Setting it is a
-deliberate choice, so Clepsydre leaves it to you. Add it to your own
-`~/.claude/settings.json`:
+auto-compaction triggers**, not just what this gauge displays. Setting it is a deliberate
+choice, so Clepsydre leaves it to you. Add it to your own `~/.claude/settings.json`:
 
 ```json
 {
@@ -98,8 +138,8 @@ deliberate choice, so Clepsydre leaves it to you. Add it to your own
 }
 ```
 
-Rule of thumb (my own): for coding I don't go past ~230k tokens; quality is meant to
-hold up to roughly 300–400k. Pick what fits your context — Clepsydre will show it.
+Rule of thumb (my own): for coding I don't go past ~230k tokens; quality is meant to hold
+up to roughly 300–400k. Pick what fits your context — Clepsydre will show it.
 
 ## Requirements
 
