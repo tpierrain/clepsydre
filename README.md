@@ -6,7 +6,7 @@
 
 > **The tokens are rising — get out fast before the stupidity zone locks you in.**
 
-**A passive, always-on gauge for your context window, built for the Claude Code CLI.** It
+**An always-on gauge for your context window, built for the Claude Code CLI.** It
 lives in your status line and shows — every turn, without you asking — how full your
 context is, so you can `/clear` at exactly the right moment.
 
@@ -23,11 +23,11 @@ context is, so you can `/clear` at exactly the right moment.
 ## The problem
 
 In the Claude Code CLI, context engineering has a blind spot: the window fills up turn
-after turn, but nothing shows it passively — and **you can't steer what you can't see.**
+after turn, but nothing keeps it in view — and **you can't steer what you can't see.**
 
 - **Checking costs you.** Hammering `/context` to find where you stand wastes time — and
   once MCP servers are loaded, each call carries a huge call stack. Clepsydre shows it
-  passively, always. No call needed.
+  for you, always. No call needed.
 - **Overflow builds silently, on two fronts.** Your context window fills with tokens
   (🧠→⚠️→🤪) *and* `MEMORY.md` — reloaded in full every session — quietly bloats and rots
   your context (🧩→⚠️→🧨). Clepsydre watches both, so you see it coming.
