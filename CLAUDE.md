@@ -27,3 +27,20 @@ plan for the next step") — **never a copy** of the plan's contents, and never 
 tasks. Why: `MEMORY.md` is reloaded *in full every session*, so duplicating plan state there
 bloats and rots the context (and it drifts out of sync the moment the plan advances). Pointers,
 not copies.
+
+## Development — test-driven, always
+
+**Every change to production code (`clepsydre.mjs`, `install.mjs`) is driven by a test, in
+strict TDD.** No production code is written or modified without a test pulling it.
+
+- **Baby-steps:** one test at a time — 🔴 red → 🟢 green → ♻️ refactor, completed for *each*
+  test before starting the next. Never write a batch of tests up front.
+- **Fail-first:** watch the new test fail *for the right reason* before writing the code that
+  makes it pass.
+- **Triangulate:** generalise the implementation only when a second, different example demands
+  it — don't over-generalise from one case.
+- **Refactor is never optional:** it's part of every step, and it is behaviour-preserving — it
+  never weakens a test's assertions or changes the public contract.
+
+Tests live in `test/clepsydre.test.mjs` (Node's built-in `node:test` + `node:assert`, no
+dependencies), run with `node --test`. The suite must be green before every commit.
