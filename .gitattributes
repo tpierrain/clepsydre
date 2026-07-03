@@ -1,0 +1,4 @@
+# Clepsydre must run identically on macOS and Windows. Pin source and docs to LF so a
+# Windows clone (core.autocrlf=true) never rewrites them to CRLF.
+* text=auto eol=lf
+*.png binary

@@ -26,46 +26,58 @@ export function fmtBytes(b) {
   return b + 'B';
 }
 
+const GREEN = '\x1b[32m';
+const ORANGE = '\x1b[33m';
+const BOLD_RED = '\x1b[1;31m';
+
+// Three-tier color/icon picker shared by both gauges: green below `warn`, orange from
+// `warn` up to `high`, bold-red at or above `high`. `icons` is [low, mid, high].
+function tier(value, warn, high, [low, mid, top]) {
+  if (value >= high) return { icon: top, color: BOLD_RED };
+  if (value >= warn) return { icon: mid, color: ORANGE };
+  return { icon: low, color: GREEN };
+}
+
 // Token segment tier by the anti-context-rot thresholds: 🧠 green < warn,
 // ⚠️ orange warn–crazy, 🤪 bold-red >= crazy (the "stupidity zone"). The thresholds
 // default to 150k/200k but the caller can override them (see resolveThresholds).
 export function tokenTier(used, { warn = 150000, crazy = 200000 } = {}) {
-  if (used >= crazy) return { icon: '🤪', color: '\x1b[1;31m' };
-  if (used >= warn) return { icon: '⚠️ ', color: '\x1b[33m' };
-  return { icon: '🧠', color: '\x1b[32m' };
+  return tier(used, warn, crazy, ['🧠', '⚠️ ', '🤪']);
 }
 
 // MEMORY.md tier — reloaded IN FULL every session (~25 KB budget): 🧩 green < warn,
 // ⚠️ orange warn–rot, 🧨 bold-red >= rot. Thresholds default to 15K/25K but the caller
 // can override them (see resolveThresholds).
 export function memTier(mdBytes, { warn = 15360, rot = 25600 } = {}) {
-  if (mdBytes >= rot) return { icon: '🧨', color: '\x1b[1;31m' };
-  if (mdBytes >= warn) return { icon: '⚠️ ', color: '\x1b[33m' };
-  return { icon: '🧩', color: '\x1b[32m' };
+  return tier(mdBytes, warn, rot, ['🧩', '⚠️ ', '🧨']);
+}
+
+// A finite, strictly-positive number parsed from `raw`, else `fallback`. Rejects
+// empty/whitespace, non-numeric, NaN, Infinity, zero and negatives — the single guard
+// shared by every "trust this value or fall back to a sane default" spot below.
+function positiveOr(raw, fallback) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
 // Working-window denominator — Clepsydre imposes nothing (see README). The user's
 // CLAUDE_CODE_AUTO_COMPACT_WINDOW wins when set, else the model's real window, else
-// a 200000 floor. Mirrors the bash `${VAR:-<context_window_size // 200000>}`.
+// a 200000 floor. Mirrors the bash `${VAR:-<context_window_size // 200000>}`. A
+// non-numeric / zero / negative value at either level is ignored, never a dead gauge.
 export function resolveMax(envRaw, contextWindowSize) {
-  if (envRaw !== undefined && envRaw !== null && envRaw !== '') return Number(envRaw);
-  return contextWindowSize ?? 200000;
+  return positiveOr(envRaw, positiveOr(contextWindowSize, 200000));
 }
 
 // Resolve the four color thresholds from the environment, falling back to the built-in
 // defaults. Returns { token: { warn, crazy }, mem: { warn, rot } } to hand straight to
 // tokenTier / memTier.
 export function resolveThresholds(env = {}) {
-  const num = (raw, fallback) => {
-    if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
-    const n = Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : fallback;
-  };
   // A pair is only accepted when its lower tier is strictly below its upper tier;
   // otherwise the whole pair reverts to defaults (a half-inverted pair makes no sense).
   const pair = (lowKey, lowDef, highKey, highDef) => {
-    const low = num(env[lowKey], lowDef);
-    const high = num(env[highKey], highDef);
+    const low = positiveOr(env[lowKey], lowDef);
+    const high = positiveOr(env[highKey], highDef);
     return low < high ? [low, high] : [lowDef, highDef];
   };
   const [tWarn, tCrazy] = pair('CLEPSYDRE_TOKEN_WARN', 150000, 'CLEPSYDRE_TOKEN_CRAZY', 200000);
@@ -127,26 +139,35 @@ export function readMemory(memDir) {
   } catch {
     return EMPTY_MEM; // folder absent or unreadable — still shown, at zero
   }
-  const mdFiles = entries.filter((f) => f.endsWith('.md'));
-  if (mdFiles.length === 0) return EMPTY_MEM; // folder exists but empty — shown at zero
-
-  const sizeOf = (f) => {
+  // One statSync per *.md entry: skip anything that isn't a regular file (a
+  // subdirectory named "*.md", or a dangling symlink whose stat throws), and capture
+  // MEMORY.md's size in the same pass — no second stat, no extra scan.
+  let mdBytes = 0;
+  let dirBytes = 0;
+  let fileCount = 0;
+  for (const name of entries) {
+    if (!name.endsWith('.md')) continue;
+    let stat;
     try {
-      return fs.statSync(path.join(memDir, f)).size;
+      stat = fs.statSync(path.join(memDir, name));
     } catch {
-      return 0;
+      continue; // broken symlink / unreadable — not a countable file
     }
-  };
-  const mdBytes = mdFiles.includes('MEMORY.md') ? sizeOf('MEMORY.md') : 0;
-  const dirBytes = mdFiles.reduce((sum, f) => sum + sizeOf(f), 0);
-  return { mdBytes, dirBytes, fileCount: mdFiles.length };
+    if (!stat.isFile()) continue; // a directory ending in ".md"
+    dirBytes += stat.size;
+    fileCount += 1;
+    if (name === 'MEMORY.md') mdBytes = stat.size;
+  }
+  if (fileCount === 0) return EMPTY_MEM; // folder exists but holds no *.md file
+  return { mdBytes, dirBytes, fileCount };
 }
 
 // Current git branch, or '' outside a repo (silent) — mirrors the bash guard.
 function gitBranch(dir) {
   if (!dir) return '';
   try {
-    execFileSync('git', ['-C', dir, 'rev-parse', '--is-inside-work-tree'], { stdio: 'ignore' });
+    // `branch --show-current` already exits non-zero outside a work tree (→ '' via the
+    // catch), so no separate rev-parse guard is needed — one spawn on this hot path.
     return execFileSync('git', ['-C', dir, 'branch', '--show-current'], { encoding: 'utf8' }).trim();
   } catch {
     return '';

@@ -153,6 +153,19 @@ test('resolveMax: with neither, it floors at 200000', () => {
   assert.equal(resolveMax(undefined, undefined), 200000);
 });
 
+test('resolveMax: a real zero context window also floors at 200000 (never a 0 denominator)', () => {
+  assert.equal(resolveMax(undefined, 0), 200000);
+});
+
+test('resolveMax: a non-numeric env override is ignored (falls back to the model window)', () => {
+  assert.equal(resolveMax('abc', 1000000), 1000000);
+});
+
+test('resolveMax: a zero or negative env override is ignored (never a dead 0 gauge)', () => {
+  assert.equal(resolveMax('0', 1000000), 1000000);
+  assert.equal(resolveMax('-1', 1000000), 1000000);
+});
+
 test('pct: integer percentage, truncated like bash integer division', () => {
   assert.equal(pct(65300, 230000), 28); // 28.39% -> 28
 });
@@ -234,6 +247,13 @@ test('readMemory: sums MEMORY.md and every *.md, and counts the files', () => {
   assert.deepEqual(readMemory(d), { mdBytes: 3, dirBytes: 5, fileCount: 2 });
 });
 
+test('readMemory: a subdirectory whose name ends in .md is not counted as a file', () => {
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-subdir-'));
+  fs.writeFileSync(path.join(d, 'MEMORY.md'), 'abc'); // 3 bytes, the only real file
+  fs.mkdirSync(path.join(d, 'archive.md')); // a directory, must be ignored
+  assert.deepEqual(readMemory(d), { mdBytes: 3, dirBytes: 3, fileCount: 1 });
+});
+
 test('readMemory: a folder without any *.md yields zeros (the segment is still shown, empty)', () => {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-empty-'));
   fs.writeFileSync(path.join(d, 'notes.txt'), 'x');
@@ -264,6 +284,24 @@ test('end-to-end: CLEPSYDRE_* env vars retune the token tier color', () => {
     `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 180.0k/400.0k (45%)${RESET}` +
       ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}\n`,
   );
+});
+
+test('end-to-end: inside a git repo the branch shows in the ⎇ segment', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  execFileSync('git', ['-C', work, 'init', '-b', 'feature-x'], { stdio: 'ignore' });
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
+  });
+  assert.match(out, /📁 [^⎇]+⎇ feature-x ·/);
 });
 
 test('end-to-end: piping Claude Code JSON prints the composed status line', () => {
