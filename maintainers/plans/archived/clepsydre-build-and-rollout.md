@@ -1,19 +1,21 @@
-# 🏺 Clepsydre — build & rollout plan
+# 🏺 Clepsydre — build & rollout plan (ARCHIVED)
+
+> **Archived — historical record of shipped work.** Every step here is done and checked,
+> with its _(date · commit)_. Do **not** resume from this file. Remaining work lives in the
+> single ongoing plan: [`../ongoing/clepsydre-rollout.md`](../ongoing/clepsydre-rollout.md).
 
 Single-purpose repo: a context-window status line for Claude Code (see `README.md`).
-This plan is the single source of truth for what's left to do. Check boxes as you go,
-and note _(date · commit)_ when a step ships.
 
-## Tracking
+## Shipped
 
-### Done — scaffolding session (2026-07-02)
+### Scaffolding session (2026-07-02)
 - [x] Repo scaffolded in `~/Dev/clepsydre`: `statusline-command.sh` (English comments,
       logic byte-for-byte identical to the original), `clepsydre.settings.json`,
       `install.sh`, `README.md`, `.gitignore`, `CLAUDE.md`, `PLAN.md`.
 - [x] `git init -b main` (branch `main`, not `master`).
 - [x] First commit on `main` — bash version preserved in history. _(2026-07-02 · be9c3e3)_
 
-### To do — cross-platform Node port (Mac + Windows)
+### Cross-platform Node port (Mac + Windows)
 Decision _(2026-07-02)_: rewrite everything in **Node.js** (guaranteed present — Claude Code
 runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **and** Windows.
 - [x] Port the status line to `clepsydre.mjs` (TDD, iso-behaviour with the bash: same
@@ -31,13 +33,13 @@ runs on it), drop the bash + `jq` + `bc` + symlink stack. One artifact, Mac **an
 - [x] Update `README.md` (Node requirement, no jq/bc, Windows notes). _(2026-07-02)_
 - [x] Commit the Node port. _(2026-07-02 · 378a656)_
 
-### To do — GitHub remote
+### GitHub remote
 - [x] Add an Apache 2.0 `LICENSE` (public, open source). _(2026-07-02)_
 - [x] Create the remote (public) and wire it: _(2026-07-02)_
   - [x] `gh repo create tpierrain/clepsydre --public --source=. --remote=origin`
   - [x] `git push -u origin main` — https://github.com/tpierrain/clepsydre
 
-### NEXT — README marketing pass (do this first)
+### README marketing pass
 Wear a **marketing-lead hat**: turn the README into something **very readable, short but
 crystal-clear** — a reader should grasp *what it does*, *what pain it kills*, and *why they
 want it* in ~15 seconds. Keep the brand French ("Clepsydre"); everything else English. Keep
@@ -102,7 +104,7 @@ the pixel-art hero banner and the two live screenshots (green/red tiers).
 
 - [x] Commit + push when done. _(2026-07-02 · f84f320)_
 
-### To do — configurable color thresholds (env vars)
+### Configurable color thresholds (env vars)
 Rationale _(2026-07-02)_: changing a color threshold is **configuration, not code**. Today the
 tiers are hard-coded in `clepsydre.mjs`, so the only way to change them is editing a
 **versioned, shared** file (pollutes the repo, risks `git pull` conflicts). Expose them as env
@@ -129,17 +131,17 @@ unchanged. Global via `~/.claude/settings.json`; **per-project override** via
 - [x] Moved the test suite to `test/clepsydre.test.mjs` (leaner root; `node --test` finds it). _(2026-07-02)_
 - [x] Tests green (39) + commit + push. _(2026-07-02 · 2797e47)_
 
-### To do — install & verify (this Mac)
+### Install & verify (this Mac)
 - [x] `node install.mjs --check`, then `node install.mjs`. _(2026-07-03 · reinstalled from a fresh `~/clepsydre` clone at b3ae4a1)_
 - [x] Restart Claude Code and confirm the gauge shows (🧠/⚠️/🤪 token tier + 🧩 `MEMORY.md`). _(2026-07-03)_
-- [ ] Note: the old `~/.claude/statusline-command.sh` (bash) is simply no longer referenced
-      once `settings.json` points at `clepsydre.mjs` — remove it by hand if you like.
 
-### To do — the other machines (Mac + Windows)
-- [ ] `git clone git@github.com:tpierrain/clepsydre.git ~/clepsydre` (home by default —
-      avoid `~/Dev/clepsydre`, which collides with the dev checkout on this Mac)
-- [ ] `cd ~/clepsydre && node install.mjs`
-- [ ] Restart Claude Code and confirm (Windows included — Node only, no jq/bc).
+### Code-review hardening pass (2026-07-03)
+- [x] TDD fixes: `resolveMax` input validation + real-zero floor; `readMemory` counts only
+      regular files; unified `tier()` helper; single `statSync` pass; one `git` spawn;
+      shared `positiveOr()` guard; `.gitattributes` (eol=lf). 44 tests green. _(2026-07-03 · b3ae4a1)_
+- [x] Cut "passive" from the README tagline + problem section. _(2026-07-03 · f4139bb)_
+- [x] Published the first GitHub release **v1.0.1** (tag on b3ae4a1), with a disclaimer that
+      the auto-attached zip/tar.gz archives are useless (install is a git clone + `git pull`). _(2026-07-03)_
 
 ### Decisions / open points
 - [x] **Working-window value.** _(2026-07-02)_ Resolved: Clepsydre does **not** pick a
