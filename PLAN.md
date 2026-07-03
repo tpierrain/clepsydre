@@ -130,8 +130,8 @@ unchanged. Global via `~/.claude/settings.json`; **per-project override** via
 - [x] Tests green (39) + commit + push. _(2026-07-02 · 2797e47)_
 
 ### To do — install & verify (this Mac)
-- [ ] `node install.mjs --check`, then `node install.mjs`.
-- [ ] Restart Claude Code and confirm the gauge shows (🧠/⚠️/🤪 token tier + 🧩 `MEMORY.md`).
+- [x] `node install.mjs --check`, then `node install.mjs`. _(2026-07-03 · reinstalled from a fresh `~/clepsydre` clone at b3ae4a1)_
+- [x] Restart Claude Code and confirm the gauge shows (🧠/⚠️/🤪 token tier + 🧩 `MEMORY.md`). _(2026-07-03)_
 - [ ] Note: the old `~/.claude/statusline-command.sh` (bash) is simply no longer referenced
       once `settings.json` points at `clepsydre.mjs` — remove it by hand if you like.
 
