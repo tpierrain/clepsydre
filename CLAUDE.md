@@ -20,6 +20,12 @@ resume at the first unchecked `- [ ]`, and announce it before acting. Tick boxes
 note _(date · commit)_ when a step ships. When an ongoing plan is fully done, move its file to
 `archived/`.
 
+**Plans must stay readable — the *what* up front, the *how* below.** Each step leads with its
+**what** (the outcome, as a short scannable headline), and keeps its **how** (commands,
+sub-steps, rationale, caveats) indented underneath. Reading only the top-level headlines must
+convey the whole plan at a glance; the detail is there when you drill into a step, never in the
+way of skimming. A human must be able to read a plan easily.
+
 **The plan is the ONLY home for what's left to do — `MEMORY.md` is not.** All actionable
 content (steps, sub-steps, done/remaining, commits, details) lives in the ongoing plan and
 nowhere else. `MEMORY.md` may hold **at most a thin pointer** to it (branch + path + "read the
