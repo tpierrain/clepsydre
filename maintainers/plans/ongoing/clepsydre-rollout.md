@@ -49,8 +49,9 @@ status-line render, so on a large repo it is paid every turn.
   > and returns a zeroed shape, so a missing/failing git never blanks the line. Thanks!
   > ```
 
-- [ ] **2. Merge PR #1 behind an opt-in flag** — the git feature is present at install, default
-      OFF, enableable by config. TDD (production code → tests first).
+- [x] **2. Merge PR #1 behind an opt-in flag** — SHIPPED _(2026-07-04 · PR #2 merge `45efcd7`;
+      PR #1 auto-marked MERGED, @guillaumejay credited)_. Git feature present, default OFF,
+      enableable by config. TDD, suite green (58 tests).
   - [x] Add a `CLEPSYDRE_GIT_COUNTS` flag read from the env (like the `CLEPSYDRE_*` thresholds:
         global via `~/.claude/settings.json`, per-project override via `<project>/.claude/settings.json`).
         Off/absent/`0` → disabled; `1`/truthy (`1`/`true`/`yes`/`on`, any case) → enabled.
@@ -65,12 +66,11 @@ status-line render, so on a large repo it is paid every turn.
         how to turn it on (`CLEPSYDRE_GIT_COUNTS=1`), globally or per-project. Suggest, don't force.
   - [x] **README**: document the flag ("Show git ahead/behind/dirty counts (optional)"), add a
         "How to read it, piece by piece" anatomy, and make the "Update" section general-public.
-  - [ ] Merge the PR, keep authorship credit to @guillaumejay. **→ PR #2 open**
-        (https://github.com/tpierrain/clepsydre/pull/2): builds on #1's merge commit, so
-        merging #2 on GitHub lands the flag work **and** auto-marks #1 as merged (credit kept).
-        Awaiting Thomas's review/merge. Local `main` reset to `origin/main` — the PR merge
-        advances it. Once merged: tick this, then move this plan file to `archived/` if step 2
-        closes the active work (steps 3–6 remain, so keep it ongoing).
+  - [x] Merge the PR, keep authorship credit to @guillaumejay _(PR #2 merged `45efcd7`; #1 →
+        MERGED automatically since its commit is reachable from `main`)_.
+
+  > **Next after `/clear`:** resume at step 3 below (the `git status` benchmark). Everything
+  > above is shipped and on `main`.
 
 - [ ] **3. Benchmark `git status` on a very large repo** — measure before building any async
       machinery ("avant qu'on fasse une usine à gaz"). Record the numbers back here.
