@@ -24,6 +24,17 @@ const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 
 const say = (s) => process.stdout.write(s + '\n');
 
+// Optional feature, suggested (not forced): the git ahead/behind/dirty counts. Off by
+// default so the status line stays instant; explain here how to opt in.
+const gitCountsTip = () => {
+  say('');
+  say('Optional — git counts after the branch (↑ahead ↓behind ±dirty):');
+  say('   Off by default: the branch shows via a cheap ref read, with no working-tree');
+  say('   scan, so the line stays instant. To turn the counts on, add to the "env" block');
+  say('   of your settings.json — globally (~/.claude/settings.json) or per-project');
+  say('   (<project>/.claude/settings.json):   "CLEPSYDRE_GIT_COUNTS": "1"');
+};
+
 say('═══════════════════════════════════════════════════════════');
 say(' Clepsydre — status line install');
 say(` repo  : ${repoDir}`);
@@ -60,6 +71,7 @@ say(`   command: ${command}`);
 if (dryRun) {
   say(`   [dry-run] would back up → ${settingsPath}.bak.${stamp}`);
   say('   [dry-run] would merge the statusLine block (other settings preserved)');
+  gitCountsTip();
   say('───────────────────────────────────────────────────────────');
   say('Dry-run done. Re-run without --check to apply.');
   process.exit(0);
@@ -73,5 +85,6 @@ if (fs.existsSync(settingsPath)) {
 fs.writeFileSync(settingsPath, JSON.stringify(merged, null, 2) + '\n');
 say('   ✓ merged (your other settings preserved)');
 
+gitCountsTip();
 say('───────────────────────────────────────────────────────────');
 say('✅ Done. Restart Claude Code to see Clepsydre in your status line.');

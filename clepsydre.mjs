@@ -88,6 +88,16 @@ export function resolveThresholds(env = {}) {
   };
 }
 
+// Resolve the git-counts opt-in flag from the environment. Off by default: enabled only
+// by an explicit truthy value (1/true/yes/on, any case). Anything else — absent, empty,
+// 0/false/no/off, garbage — keeps it disabled, so the cheap branch-only path stays the
+// default (see gitInfo). Read from process.env like the CLEPSYDRE_* thresholds, so it can
+// be set globally (~/.claude/settings.json) or per-project (<project>/.claude/settings.json).
+const GIT_COUNTS_ON = new Set(['1', 'true', 'yes', 'on']);
+export function resolveGitCounts(env = {}) {
+  return GIT_COUNTS_ON.has(String(env.CLEPSYDRE_GIT_COUNTS ?? '').trim().toLowerCase());
+}
+
 // Integer percentage of the working window used, truncated (bash `USED*100/MAX`).
 export function pct(used, max) {
   return max > 0 ? Math.trunc((used * 100) / max) : 0;
@@ -95,17 +105,33 @@ export function pct(used, max) {
 
 const RESET = '\x1b[0m';
 
+// Compact git state suffix for the branch segment: ↑ahead (commits to push), ↓behind
+// (commits to pull), ±dirty (uncommitted changes — tracked edits + untracked files).
+// Each part is shown only when non-zero; an all-zero (clean, in-sync) repo returns ''
+// so the branch segment stays uncluttered.
+export function gitCounts(ahead = 0, behind = 0, dirty = 0) {
+  const parts = [];
+  if (ahead > 0) parts.push(`↑${ahead}`);
+  if (behind > 0) parts.push(`↓${behind}`);
+  if (dirty > 0) parts.push(`±${dirty}`);
+  return parts.join(' ');
+}
+
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
-// fs or git here). `mem` is { mdBytes, dirBytes, fileCount } — the live path always
-// passes one (readMemory returns zeros for an empty/absent folder, so the segment is
-// always shown). A null `mem` omits the segment: a convenience for focused unit tests
-// that don't care about memory. Mirrors the bash assembly order and separators.
-export function buildStatusLine({ model, basename, branch, used, max, mem, thresholds }) {
+// fs or git here). `git` is { branch, ahead, behind, dirty } and `mem` is
+// { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
+// return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
+// segment: a convenience for focused unit tests. Mirrors the bash assembly order.
+export function buildStatusLine({ model, basename, git, used, max, mem, thresholds }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
   let out = `[${model}] 📁 ${basename}`;
-  if (branch) out += ` ⎇ ${branch}`;
+  if (git?.branch) {
+    out += ` ⎇ ${git.branch}`;
+    const counts = gitCounts(git.ahead, git.behind, git.dirty);
+    if (counts) out += ` ${ORANGE}${counts}${RESET}`;
+  }
   out += ` · ${tok}`;
   if (mem) {
     const m = memTier(mem.mdBytes, t.mem);
@@ -162,15 +188,63 @@ export function readMemory(memDir) {
   return { mdBytes, dirBytes, fileCount };
 }
 
-// Current git branch, or '' outside a repo (silent) — mirrors the bash guard.
-function gitBranch(dir) {
-  if (!dir) return '';
+// Pure parse of `git status --porcelain=v2 --branch` output → { branch, ahead, behind,
+// dirty }. branch is '' when detached; ahead/behind are 0 when there's no upstream (the
+// `# branch.ab` header is then absent); dirty counts every changed path. Kept separate
+// from the spawn so the fragile header/regex/counter logic is unit-tested in isolation,
+// like readMemory. Parsing '' yields the all-zero shape (used as the no-repo fallback).
+export function parseGitStatus(out) {
+  const headHeader = '# branch.head ';
+  let branch = '', ahead = 0, behind = 0, dirty = 0;
+  for (const line of out.split('\n')) {
+    if (line.startsWith(headHeader)) {
+      const b = line.slice(headHeader.length).trim();
+      branch = b === '(detached)' ? '' : b;
+    } else if (line.startsWith('# branch.ab ')) {
+      // "# branch.ab +2 -0" → ahead 2, behind 0
+      const m = line.match(/\+(\d+)\s+-(\d+)/);
+      if (m) { ahead = Number(m[1]); behind = Number(m[2]); }
+    } else if (line && line[0] !== '#') {
+      dirty++; // one entry per changed path (1/2/u tracked, ? untracked)
+    }
+  }
+  return { branch, ahead, behind, dirty };
+}
+
+const EMPTY_GIT = { branch: '', ahead: 0, behind: 0, dirty: 0 };
+
+// Run `git -C <dir> <args...>` and return its stdout. The default runner used in
+// production; unit tests inject a fake to exercise gitInfo's branching without spawning.
+function runGit(dir, args) {
+  return execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+}
+
+// Current git state, gated by the `counts` opt-in (resolveGitCounts). Both paths return
+// the same { branch, ahead, behind, dirty } shape:
+//   • counts OFF (default): the CHEAP `git branch --show-current` — reads a ref, no
+//     working-tree scan. ahead/behind/dirty stay 0, so gitCounts() renders no suffix.
+//   • counts ON: a SINGLE `status --porcelain=v2 --branch` spawn feeds branch + ↑↓± at
+//     once, at the cost of scanning the whole working tree on this hot path.
+// Robust by construction, in two layers: (1) nothing here ever throws out to main(), so a
+// git problem only ever costs the git segment, never the rest of the status line; (2) when
+// counts is ON and the porcelain scan fails, we DEGRADE to the cheap branch-only path
+// instead of dropping the segment — so the current branch keeps showing even if the
+// advanced ↑↓± feature hits a snag. `run` is injectable for unit tests.
+export function gitInfo(dir, counts, run = runGit) {
+  if (!dir) return EMPTY_GIT;
+  // The cheap, always-available baseline: just the current branch, no working-tree scan.
+  const branchOnly = () => {
+    try {
+      return { ...EMPTY_GIT, branch: run(dir, ['branch', '--show-current']).trim() };
+    } catch {
+      return EMPTY_GIT; // git absent / not a work tree — segment silently disappears
+    }
+  };
+  if (!counts) return branchOnly();
   try {
-    // `branch --show-current` already exits non-zero outside a work tree (→ '' via the
-    // catch), so no separate rev-parse guard is needed — one spawn on this hot path.
-    return execFileSync('git', ['-C', dir, 'branch', '--show-current'], { encoding: 'utf8' }).trim();
+    return parseGitStatus(run(dir, ['status', '--porcelain=v2', '--branch']));
   } catch {
-    return '';
+    return branchOnly(); // advanced git (↑↓±) failed → keep the branch, drop only the counts
   }
 }
 
@@ -193,10 +267,11 @@ export function main() {
     input.transcript_path && input.transcript_path !== 'null' ? input.transcript_path : '';
   const mem = readMemory(computeMemDir(transcript, dir, os.homedir()));
 
+  const git = gitInfo(dir, resolveGitCounts(process.env));
   const line = buildStatusLine({
     model,
     basename: path.basename(dir),
-    branch: gitBranch(dir),
+    git,
     used,
     max,
     mem,

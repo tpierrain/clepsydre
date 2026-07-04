@@ -37,7 +37,7 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 ## What you see
 
 ```
-[Opus 4.8] 📁 my-project ⎇ main · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
+[Opus 4.8] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
 ```
 
 - **Model · folder · git branch**
@@ -47,6 +47,21 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
   - 🤪 red — ≥ 200k, the stupidity zone, `/clear` now
 - **Memory weight** — size of `MEMORY.md` (reloaded in full every session) and the memory folder:
   - 🧩 green < 15K · ⚠️ orange 15–25K · 🧨 red ≥ 25K
+
+### How to read it, piece by piece
+
+Reading the example line above from left to right:
+
+| Piece | Means |
+| --- | --- |
+| `[Opus 4.8]` | The **model** currently answering you. |
+| `📁 my-project` | The **folder** (project) you're working in. |
+| `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Outside a repo, this whole part just disappears. |
+| `↑2 ↓1 ±8` | **Git state** — *optional, off by default* (see [git counts](#show-git-aheadbehinddirty-counts-optional)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
+| `·` | Just a **separator** between groups. |
+| `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
+| `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
+| `mem 18.0K/12f` | The **whole memory folder**: `18.0K` total across every memory file, `12f` = **12 files**. Reads on demand, so it doesn't cost context the way `MEMORY.md` does — this is just its footprint on disk. |
 
 Plenty of headroom — 🧠 green, you're fine:
 
@@ -134,14 +149,14 @@ Restart Claude Code to see it.
 
 ## Update
 
-Because the status line runs this repo's file directly, `git pull` is enough for script
-changes — no re-install, on any OS.
+Your status line runs this repo's file directly, so **`git pull` is all it takes** to get
+new versions — no re-install, on any OS. Pull, restart Claude Code, and you're on the latest.
 
-| You change… | Where you set it | On the other machine |
-| --- | --- | --- |
-| **the color thresholds** (when 🧠→⚠️→🤪 and 🧩→⚠️→🧨 kick in) | your own `settings.json` — the `CLEPSYDRE_*` env vars (see [Customize the color thresholds](#customize-the-color-thresholds)) | nothing — it's your local config, per machine or per project |
-| **the gauge itself** (format, logic, new segments) | edit `clepsydre.mjs` → `git commit && git push` | `git pull` — done |
-| **where it lives** (moved the repo) | — | `git pull` then `node install.mjs` (rewrites the path) |
+| What you want | What to do |
+| --- | --- |
+| **Get the latest Clepsydre** (fixes, new segments) | `git pull` in the repo, then restart Claude Code |
+| **Tune your colors, thresholds or git counts** | set the `CLEPSYDRE_*` env vars in your own `settings.json` — it takes effect on the next render, no pull needed (see [Customize the color thresholds](#customize-the-color-thresholds)) |
+| **Moved the repo to another folder** | `git pull`, then `node install.mjs` again (it rewrites the path Claude Code points at) |
 
 ## The working window
 
@@ -204,6 +219,40 @@ vars, each defaulting to today's behavior:
 Set only the ones you care about; the rest keep their defaults. Anything empty,
 non-numeric, or non-positive is ignored, and a pair whose `WARN` isn't below its
 `CRAZY`/`ROT` quietly reverts to its defaults — a bad value can never break the gauge.
+
+## Show git ahead/behind/dirty counts (optional)
+
+Off by default, one opt-in env var turns on a compact git state suffix after the branch:
+
+```
+[Opus 4.8] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · …
+```
+
+- **↑2** commits ahead of upstream (to push) · **↓1** behind (to pull) · **±8** uncommitted
+  changes (tracked edits + untracked files). Each part shows only when non-zero; a clean,
+  in-sync repo adds nothing.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_GIT_COUNTS` | *(off)* | `1` (or `true`/`yes`/`on`) shows the ↑↓± suffix |
+
+Set it in the same `"env"` block, globally or per-project (see above):
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_GIT_COUNTS": "1"
+  }
+}
+```
+
+**Why it's off by default (for now).** Showing the branch alone is cheap — it just reads a
+ref. The counts need `git status`, which scans the whole working tree *on every render*, so
+on a very large repo that cost is paid every turn. Clepsydre's pitch is that the gauge costs
+you nothing, so the scan is opt-in while its cost is measured — it's slated to become the
+default (opt-out) once that's settled. Either way it's robust: if git ever fails with the
+counts on, the line falls back to the plain branch and the rest of the status line is never
+affected.
 
 ## Requirements
 

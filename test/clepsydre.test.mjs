@@ -7,7 +7,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   fmtTokens, fmtBytes, tokenTier, memTier, resolveMax, pct, buildStatusLine,
-  computeMemDir, readMemory, resolveThresholds,
+  computeMemDir, readMemory, resolveThresholds, gitCounts, parseGitStatus,
+  resolveGitCounts, gitInfo,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -137,6 +138,29 @@ test('resolveThresholds: an inverted mem pair falls back to mem defaults, token 
   });
 });
 
+test('resolveGitCounts: absent flag → disabled (off by default)', () => {
+  assert.equal(resolveGitCounts({}), false);
+});
+
+test('resolveGitCounts: CLEPSYDRE_GIT_COUNTS=1 → enabled', () => {
+  assert.equal(resolveGitCounts({ CLEPSYDRE_GIT_COUNTS: '1' }), true);
+});
+
+test('resolveGitCounts: other truthy spellings (true/yes/on, any case) → enabled', () => {
+  for (const v of ['true', 'TRUE', 'yes', 'on', ' On ']) {
+    assert.equal(resolveGitCounts({ CLEPSYDRE_GIT_COUNTS: v }), true, v);
+  }
+});
+
+test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only, never lose the branch', () => {
+  const run = (dir, args) => {
+    if (args[0] === 'status') throw new Error('porcelain unsupported / git hiccup');
+    if (args[0] === 'branch') return 'main\n';
+    throw new Error(`unexpected git ${args.join(' ')}`);
+  };
+  assert.deepEqual(gitInfo('/repo', true, run), { branch: 'main', ahead: 0, behind: 0, dirty: 0 });
+});
+
 test('resolveMax: the user CLAUDE_CODE_AUTO_COMPACT_WINDOW wins when set', () => {
   assert.equal(resolveMax('230000', 1000000), 230000);
 });
@@ -176,7 +200,7 @@ test('pct: guards against a zero denominator', () => {
 
 test('buildStatusLine: model, folder and the colored token gauge (no branch, no memory)', () => {
   const line = buildStatusLine({
-    model: 'Opus 4.8', basename: 'my-project', branch: '',
+    model: 'Opus 4.8', basename: 'my-project',
     used: 65300, max: 230000, mem: null,
   });
   assert.equal(line, `[Opus 4.8] 📁 my-project · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`);
@@ -184,15 +208,73 @@ test('buildStatusLine: model, folder and the colored token gauge (no branch, no 
 
 test('buildStatusLine: a git branch adds a ⎇ segment before the gauge', () => {
   const line = buildStatusLine({
-    model: 'Opus 4.8', basename: 'my-project', branch: 'main',
+    model: 'Opus 4.8', basename: 'my-project', git: { branch: 'main' },
     used: 65300, max: 230000, mem: null,
   });
   assert.equal(line, `[Opus 4.8] 📁 my-project ⎇ main · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`);
 });
 
+test('parseGitStatus: branch, ahead/behind and dirty from porcelain-v2 output', () => {
+  const out = [
+    '# branch.oid abc123',
+    '# branch.head main',
+    '# branch.upstream origin/main',
+    '# branch.ab +2 -3',
+    '1 .M N... 100644 100644 100644 aaa bbb file-modified.txt',
+    '2 R. N... 100644 100644 100644 ccc ddd R100 new.txt\told.txt',
+    'u UU N... 100644 100644 100644 100644 eee fff ggg conflict.txt',
+    '? untracked.txt',
+    '',
+  ].join('\n');
+  assert.deepEqual(parseGitStatus(out), { branch: 'main', ahead: 2, behind: 3, dirty: 4 });
+});
+
+test('parseGitStatus: no upstream → ahead/behind stay 0 (no branch.ab header)', () => {
+  const out = '# branch.head feature-x\n';
+  assert.deepEqual(parseGitStatus(out), { branch: 'feature-x', ahead: 0, behind: 0, dirty: 0 });
+});
+
+test('parseGitStatus: detached HEAD → empty branch', () => {
+  const out = '# branch.oid abc123\n# branch.head (detached)\n# branch.ab +0 -0\n';
+  assert.deepEqual(parseGitStatus(out), { branch: '', ahead: 0, behind: 0, dirty: 0 });
+});
+
+test('parseGitStatus: empty input yields the all-zero fallback shape', () => {
+  assert.deepEqual(parseGitStatus(''), { branch: '', ahead: 0, behind: 0, dirty: 0 });
+});
+
+test('gitCounts: shows only non-zero parts, clean+synced → empty string', () => {
+  assert.equal(gitCounts(0, 0, 0), '');
+  assert.equal(gitCounts(2, 0, 0), '↑2');
+  assert.equal(gitCounts(0, 3, 0), '↓3');
+  assert.equal(gitCounts(0, 0, 8), '±8');
+  assert.equal(gitCounts(2, 3, 8), '↑2 ↓3 ±8');
+});
+
+test('buildStatusLine: ahead/behind/dirty add an orange git-counts suffix after the branch', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'my-project',
+    git: { branch: 'main', ahead: 2, behind: 0, dirty: 8 },
+    used: 65300, max: 230000, mem: null,
+  });
+  assert.equal(
+    line,
+    `[Opus 4.8] 📁 my-project ⎇ main ${ORANGE}↑2 ±8${RESET} · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`,
+  );
+});
+
+test('buildStatusLine: no branch means the git-counts suffix is never shown', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'p',
+    git: { branch: '', ahead: 5, behind: 5, dirty: 5 },
+    used: 1000, max: 230000, mem: null,
+  });
+  assert.equal(line, `[Opus 4.8] 📁 p · ${GREEN}🧠 1.0k/230.0k (0%)${RESET}`);
+});
+
 test('buildStatusLine: a memory folder appends the colored MEMORY.md weight segment', () => {
   const line = buildStatusLine({
-    model: 'Opus 4.8', basename: 'my-project', branch: 'main',
+    model: 'Opus 4.8', basename: 'my-project', git: { branch: 'main' },
     used: 65300, max: 230000,
     mem: { mdBytes: 4300, dirBytes: 18432, fileCount: 12 },
   });
@@ -206,7 +288,7 @@ test('buildStatusLine: a memory folder appends the colored MEMORY.md weight segm
 test('buildStatusLine: honors custom thresholds for the token gauge color', () => {
   // 180k would be orange under the defaults; with a higher warn it stays green.
   const line = buildStatusLine({
-    model: 'Opus 4.8', basename: 'p', branch: '',
+    model: 'Opus 4.8', basename: 'p',
     used: 180000, max: 400000, mem: null,
     thresholds: { token: { warn: 190000, crazy: 250000 }, mem: { warn: 15360, rot: 25600 } },
   });
@@ -302,6 +384,67 @@ test('end-to-end: inside a git repo the branch shows in the ⎇ segment', () => 
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
   });
   assert.match(out, /📁 [^⎇]+⎇ feature-x ·/);
+});
+
+test('end-to-end: git-counts flag OFF (default) → branch only, no ↑↓± suffix even when dirty', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  execFileSync('git', ['-C', work, 'init', '-b', 'feature-x'], { stdio: 'ignore' });
+  fs.writeFileSync(path.join(work, 'dirty.txt'), 'x'); // untracked → would be a ±1 under porcelain
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }, // no CLEPSYDRE_GIT_COUNTS
+  });
+  assert.match(out, /⎇ feature-x ·/); // branch shown, immediately followed by the gauge separator
+  assert.doesNotMatch(out, /[↑↓±]/); // the cheap default path never spends a working-tree scan
+});
+
+test('end-to-end: git-counts flag ON → the ↑↓± suffix shows alongside the branch in a dirty repo', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  execFileSync('git', ['-C', work, 'init', '-b', 'feature-x'], { stdio: 'ignore' });
+  fs.writeFileSync(path.join(work, 'dirty.txt'), 'x'); // untracked → ±1
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '1' },
+  });
+  assert.match(out, /⎇ feature-x \x1B\[33m±1\x1B\[0m ·/); // branch + orange ±1 before the gauge
+});
+
+test('end-to-end: git-counts flag ON but NOT a git repo → full line still renders, git segment just absent', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-')); // not a git repo
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '1' },
+  });
+  // A git failure with counts ON costs only the git segment: the rest of the bar is intact.
+  assert.equal(
+    out,
+    `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 65.3k/1.0M (6%)${RESET}` +
+      ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}\n`,
+  );
 });
 
 test('end-to-end: piping Claude Code JSON prints the composed status line', () => {
