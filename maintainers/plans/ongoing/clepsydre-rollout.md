@@ -65,7 +65,12 @@ status-line render, so on a large repo it is paid every turn.
         how to turn it on (`CLEPSYDRE_GIT_COUNTS=1`), globally or per-project. Suggest, don't force.
   - [x] **README**: document the flag ("Show git ahead/behind/dirty counts (optional)"), add a
         "How to read it, piece by piece" anatomy, and make the "Update" section general-public.
-  - [ ] Merge the PR, keep authorship credit to @guillaumejay.
+  - [ ] Merge the PR, keep authorship credit to @guillaumejay. **→ PR #2 open**
+        (https://github.com/tpierrain/clepsydre/pull/2): builds on #1's merge commit, so
+        merging #2 on GitHub lands the flag work **and** auto-marks #1 as merged (credit kept).
+        Awaiting Thomas's review/merge. Local `main` reset to `origin/main` — the PR merge
+        advances it. Once merged: tick this, then move this plan file to `archived/` if step 2
+        closes the active work (steps 3–6 remain, so keep it ongoing).
 
 - [ ] **3. Benchmark `git status` on a very large repo** — measure before building any async
       machinery ("avant qu'on fasse une usine à gaz"). Record the numbers back here.
