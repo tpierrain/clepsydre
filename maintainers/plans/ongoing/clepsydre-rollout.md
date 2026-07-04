@@ -106,8 +106,9 @@ status-line render, so on a large repo it is paid every turn.
         refresh ("usine à gaz"): the benchmark showed the plain synchronous scan is cheap enough.
         The cache pattern stays available as a future step if a field report ever demands it (see
         ADR "Consequences → Reversible").
-  - [ ] Commit the flip + docs, then cut the release (MINOR) — "The One That…" naming, with a
-        dedication thanking @guillaumejay for the idea and contribution.
+  - [x] Committed the flip + docs (PR #3 → merged `9c7cce7`) and cut the release
+        **v1.2.0 — "The One That Counts Without Being Asked"**, with a dedication thanking
+        @guillaumejay for the idea and contribution. _(2026-07-04 · release v1.2.0)_
 
 - [ ] **5. Roll out to the other machines (Mac + Windows)** — the cross-platform confirmation.
   - [ ] `git clone git@github.com:tpierrain/clepsydre.git ~/clepsydre` (home by default — avoid
