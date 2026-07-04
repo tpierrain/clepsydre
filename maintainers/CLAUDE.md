@@ -51,3 +51,26 @@ strict TDD.** No production code is written or modified without a test pulling i
 
 Tests live in `test/clepsydre.test.mjs` (Node's built-in `node:test` + `node:assert`, no
 dependencies), run with `node --test`. The suite must be green before every commit.
+
+## Releases
+
+Clepsydre follows **semantic versioning** (`vMAJOR.MINOR.PATCH`): a new user-facing feature
+bumps MINOR, a bug-fix/hardening-only release bumps PATCH, a breaking change bumps MAJOR.
+
+**Release titles use the *Friends* formalism — "The One That…".** Every GitHub release is
+named after the sitcom's episode convention (*"The One Where…"*, *"The One With…"*): a single
+witty line, starting with **"The One That…"**, that says in plain language **what this release
+gives you**. Format:
+
+```
+vX.Y.Z — The One That <what it offers>
+```
+
+- Capture the release's *headline value*, not a list — one idea, the thing a user would tell a
+  friend about (e.g. a release adding opt-in git counts → *"The One That Counts (Only When You
+  Ask)"*).
+- English, playful but clear; the pun should still convey the actual feature.
+- The body then follows the established structure (a one-paragraph intro, then `### Highlights`
+  and any `### …` sections), mirroring the previous release for consistency.
+- Publish with `gh release create vX.Y.Z --title "…" --notes "…"` (or `--notes-file`).
+  **Pre-flight (see language rule):** every word of the title and notes is English.
