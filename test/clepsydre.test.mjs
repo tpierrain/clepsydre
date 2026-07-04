@@ -138,8 +138,8 @@ test('resolveThresholds: an inverted mem pair falls back to mem defaults, token 
   });
 });
 
-test('resolveGitCounts: absent flag → disabled (off by default)', () => {
-  assert.equal(resolveGitCounts({}), false);
+test('resolveGitCounts: absent flag → enabled (on by default)', () => {
+  assert.equal(resolveGitCounts({}), true);
 });
 
 test('resolveGitCounts: CLEPSYDRE_GIT_COUNTS=1 → enabled', () => {
@@ -149,6 +149,12 @@ test('resolveGitCounts: CLEPSYDRE_GIT_COUNTS=1 → enabled', () => {
 test('resolveGitCounts: other truthy spellings (true/yes/on, any case) → enabled', () => {
   for (const v of ['true', 'TRUE', 'yes', 'on', ' On ']) {
     assert.equal(resolveGitCounts({ CLEPSYDRE_GIT_COUNTS: v }), true, v);
+  }
+});
+
+test('resolveGitCounts: explicit opt-out (0/false/no/off, any case) → disabled', () => {
+  for (const v of ['0', 'false', 'FALSE', 'no', 'off', ' Off ']) {
+    assert.equal(resolveGitCounts({ CLEPSYDRE_GIT_COUNTS: v }), false, v);
   }
 });
 
@@ -386,7 +392,7 @@ test('end-to-end: inside a git repo the branch shows in the ⎇ segment', () => 
   assert.match(out, /📁 [^⎇]+⎇ feature-x ·/);
 });
 
-test('end-to-end: git-counts flag OFF (default) → branch only, no ↑↓± suffix even when dirty', () => {
+test('end-to-end: git-counts opted OUT (=0) → branch only, no ↑↓± suffix even when dirty', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
@@ -400,10 +406,10 @@ test('end-to-end: git-counts flag OFF (default) → branch only, no ↑↓± suf
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }, // no CLEPSYDRE_GIT_COUNTS
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '0' }, // opt-out
   });
   assert.match(out, /⎇ feature-x ·/); // branch shown, immediately followed by the gauge separator
-  assert.doesNotMatch(out, /[↑↓±]/); // the cheap default path never spends a working-tree scan
+  assert.doesNotMatch(out, /[↑↓±]/); // opting out falls back to the cheap branch-only path, no working-tree scan
 });
 
 test('end-to-end: git-counts flag ON → the ↑↓± suffix shows alongside the branch in a dirty repo', () => {
