@@ -4,49 +4,24 @@ Clepsydre is a single-purpose product repo: a **context-window status line for C
 Code** (see `README.md`). The brand name is French ("Clepsydre", the Fort Boyard water
 clock); **every other artifact is in English** (code, comments, docs, commits).
 
-## Plans & resuming work
+## Are you a user, or a maintainer?
 
-Plans live under **`maintainers/plans/`**, split three ways:
+This repo ships **in full** to everyone who installs Clepsydre: the installer points Claude
+Code's status line at this very checkout, and `git pull` is how updates propagate. So most
+people opening Claude Code in this folder are **users**, not maintainers of Clepsydre.
 
-- **`ongoing/`** — the **single** active plan (exactly one at any time). Holds only what's
-  left to do, as `- [ ]` / `- [x]` checkboxes. This is the source of truth for what's next.
-- **`archived/`** — shipped plans, kept as a historical record (all boxes checked, each with
-  its _(date · commit)_). Never resume from here.
-- **`prospective/`** — maybe-someday ideas, not scheduled. Promote one into `ongoing/` when it
-  becomes the active plan.
+**If you're just using Clepsydre** (you installed it and opened Claude Code here): there is
+**nothing to resume or continue** in this repo. To update, run `git pull`. To change colors,
+thresholds or the git counts, edit *your own* `settings.json` — never files here (see
+`README.md`). Do not offer to "continue the plan" or start development work: help with
+whatever the user actually asked instead.
 
-**Resuming work:** open the plan in `maintainers/plans/ongoing/`, go to its Tracking section,
-resume at the first unchecked `- [ ]`, and announce it before acting. Tick boxes as you go and
-note _(date · commit)_ when a step ships. When an ongoing plan is fully done, move its file to
-`archived/`.
+**If you're maintaining/developing Clepsydre itself** — and only when the user *explicitly*
+asks to develop it or resume the work (e.g. "on reprend", "resume the plan", "let's work on
+Clepsydre") — then **first read [`maintainers/CLAUDE.md`](maintainers/CLAUDE.md) and follow
+it**. It holds the development conventions, the active plan, and how to resume. Until the user
+clearly asks for that, ignore it entirely and treat this as a normal user session.
 
-**Plans must stay readable — the *what* up front, the *how* below.** Each step leads with its
-**what** (the outcome, as a short scannable headline), and keeps its **how** (commands,
-sub-steps, rationale, caveats) indented underneath. Reading only the top-level headlines must
-convey the whole plan at a glance; the detail is there when you drill into a step, never in the
-way of skimming. A human must be able to read a plan easily.
-
-**The plan is the ONLY home for what's left to do — `MEMORY.md` is not.** All actionable
-content (steps, sub-steps, done/remaining, commits, details) lives in the ongoing plan and
-nowhere else. `MEMORY.md` may hold **at most a thin pointer** to it (branch + path + "read the
-plan for the next step") — **never a copy** of the plan's contents, and never a running list of
-tasks. Why: `MEMORY.md` is reloaded *in full every session*, so duplicating plan state there
-bloats and rots the context (and it drifts out of sync the moment the plan advances). Pointers,
-not copies.
-
-## Development — test-driven, always
-
-**Every change to production code (`clepsydre.mjs`, `install.mjs`) is driven by a test, in
-strict TDD.** No production code is written or modified without a test pulling it.
-
-- **Baby-steps:** one test at a time — 🔴 red → 🟢 green → ♻️ refactor, completed for *each*
-  test before starting the next. Never write a batch of tests up front.
-- **Fail-first:** watch the new test fail *for the right reason* before writing the code that
-  makes it pass.
-- **Triangulate:** generalise the implementation only when a second, different example demands
-  it — don't over-generalise from one case.
-- **Refactor is never optional:** it's part of every step, and it is behaviour-preserving — it
-  never weakens a test's assertions or changes the public contract.
-
-Tests live in `test/clepsydre.test.mjs` (Node's built-in `node:test` + `node:assert`, no
-dependencies), run with `node --test`. The suite must be green before every commit.
+> In short: the maintainer workflow is **opt-in, triggered by an explicit request** — never
+> proactively proposed. The `maintainers/**` files present in every install are inert; nothing
+> here tells you to act on them unless a maintainer asks.

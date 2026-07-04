@@ -107,6 +107,15 @@ status-line render, so on a large repo it is paid every turn.
           segment is non-zero where memories exist (the `C:\…` → `C--…` cwd encoding is an
           unverified assumption about `~/.claude/projects/**` naming on Windows).
 
+- [x] **Split `CLAUDE.md` for maintainer/public separation** — SHIPPED _(2026-07-04)_. Since
+      the whole repo (incl. `CLAUDE.md`) ships to every install, the unconditional "resume the
+      plan" instruction was leaking maintainer behavior to end users.
+  - [x] Root `CLAUDE.md` → lean, public-facing: what Clepsydre is + a user guard ("nothing to
+        resume; `git pull` to update") + an **opt-in** maintainer pointer, triggered only by an
+        explicit request (e.g. "on reprend") → read `maintainers/CLAUDE.md`. Never proactive.
+  - [x] New `maintainers/CLAUDE.md` → holds all dev/maintenance content (Plans & resuming,
+        TDD discipline). Loads on explicit dev request (or when touching `maintainers/**`).
+
 - [ ] **6. Housekeeping (optional)**
   - [ ] Remove the old `~/.claude/statusline-command.sh` (bash) by hand — no longer referenced
         once `settings.json` points at `clepsydre.mjs`.
