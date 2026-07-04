@@ -88,6 +88,16 @@ export function resolveThresholds(env = {}) {
   };
 }
 
+// Resolve the git-counts opt-in flag from the environment. Off by default: enabled only
+// by an explicit truthy value (1/true/yes/on, any case). Anything else — absent, empty,
+// 0/false/no/off, garbage — keeps it disabled, so the cheap branch-only path stays the
+// default (see gitInfo). Read from process.env like the CLEPSYDRE_* thresholds, so it can
+// be set globally (~/.claude/settings.json) or per-project (<project>/.claude/settings.json).
+const GIT_COUNTS_ON = new Set(['1', 'true', 'yes', 'on']);
+export function resolveGitCounts(env = {}) {
+  return GIT_COUNTS_ON.has(String(env.CLEPSYDRE_GIT_COUNTS ?? '').trim().toLowerCase());
+}
+
 // Integer percentage of the working window used, truncated (bash `USED*100/MAX`).
 export function pct(used, max) {
   return max > 0 ? Math.trunc((used * 100) / max) : 0;
@@ -201,18 +211,40 @@ export function parseGitStatus(out) {
   return { branch, ahead, behind, dirty };
 }
 
-// Current git state via a SINGLE `status --porcelain=v2 --branch` spawn — one spawn feeds
-// the whole segment (branch + ahead/behind + dirty), cheaper than one call per datum on
-// this hot path. Returns the zeroed shape outside a work tree / when git is absent.
-function gitInfo(dir) {
-  const empty = { branch: '', ahead: 0, behind: 0, dirty: 0 };
-  if (!dir) return empty;
+const EMPTY_GIT = { branch: '', ahead: 0, behind: 0, dirty: 0 };
+
+// Run `git -C <dir> <args...>` and return its stdout. The default runner used in
+// production; unit tests inject a fake to exercise gitInfo's branching without spawning.
+function runGit(dir, args) {
+  return execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+}
+
+// Current git state, gated by the `counts` opt-in (resolveGitCounts). Both paths return
+// the same { branch, ahead, behind, dirty } shape:
+//   • counts OFF (default): the CHEAP `git branch --show-current` — reads a ref, no
+//     working-tree scan. ahead/behind/dirty stay 0, so gitCounts() renders no suffix.
+//   • counts ON: a SINGLE `status --porcelain=v2 --branch` spawn feeds branch + ↑↓± at
+//     once, at the cost of scanning the whole working tree on this hot path.
+// Robust by construction, in two layers: (1) nothing here ever throws out to main(), so a
+// git problem only ever costs the git segment, never the rest of the status line; (2) when
+// counts is ON and the porcelain scan fails, we DEGRADE to the cheap branch-only path
+// instead of dropping the segment — so the current branch keeps showing even if the
+// advanced ↑↓± feature hits a snag. `run` is injectable for unit tests.
+export function gitInfo(dir, counts, run = runGit) {
+  if (!dir) return EMPTY_GIT;
+  // The cheap, always-available baseline: just the current branch, no working-tree scan.
+  const branchOnly = () => {
+    try {
+      return { ...EMPTY_GIT, branch: run(dir, ['branch', '--show-current']).trim() };
+    } catch {
+      return EMPTY_GIT; // git absent / not a work tree — segment silently disappears
+    }
+  };
+  if (!counts) return branchOnly();
   try {
-    return parseGitStatus(
-      execFileSync('git', ['-C', dir, 'status', '--porcelain=v2', '--branch'], { encoding: 'utf8' }),
-    );
+    return parseGitStatus(run(dir, ['status', '--porcelain=v2', '--branch']));
   } catch {
-    return empty; // outside a work tree / git absent — segment silently disappears
+    return branchOnly(); // advanced git (↑↓±) failed → keep the branch, drop only the counts
   }
 }
 
@@ -235,7 +267,7 @@ export function main() {
     input.transcript_path && input.transcript_path !== 'null' ? input.transcript_path : '';
   const mem = readMemory(computeMemDir(transcript, dir, os.homedir()));
 
-  const git = gitInfo(dir);
+  const git = gitInfo(dir, resolveGitCounts(process.env));
   const line = buildStatusLine({
     model,
     basename: path.basename(dir),

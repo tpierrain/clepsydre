@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   fmtTokens, fmtBytes, tokenTier, memTier, resolveMax, pct, buildStatusLine,
   computeMemDir, readMemory, resolveThresholds, gitCounts, parseGitStatus,
+  resolveGitCounts, gitInfo,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -135,6 +136,29 @@ test('resolveThresholds: an inverted mem pair falls back to mem defaults, token 
     token: { warn: 120000, crazy: 180000 },
     mem: { warn: 15360, rot: 25600 },
   });
+});
+
+test('resolveGitCounts: absent flag → disabled (off by default)', () => {
+  assert.equal(resolveGitCounts({}), false);
+});
+
+test('resolveGitCounts: CLEPSYDRE_GIT_COUNTS=1 → enabled', () => {
+  assert.equal(resolveGitCounts({ CLEPSYDRE_GIT_COUNTS: '1' }), true);
+});
+
+test('resolveGitCounts: other truthy spellings (true/yes/on, any case) → enabled', () => {
+  for (const v of ['true', 'TRUE', 'yes', 'on', ' On ']) {
+    assert.equal(resolveGitCounts({ CLEPSYDRE_GIT_COUNTS: v }), true, v);
+  }
+});
+
+test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only, never lose the branch', () => {
+  const run = (dir, args) => {
+    if (args[0] === 'status') throw new Error('porcelain unsupported / git hiccup');
+    if (args[0] === 'branch') return 'main\n';
+    throw new Error(`unexpected git ${args.join(' ')}`);
+  };
+  assert.deepEqual(gitInfo('/repo', true, run), { branch: 'main', ahead: 0, behind: 0, dirty: 0 });
 });
 
 test('resolveMax: the user CLAUDE_CODE_AUTO_COMPACT_WINDOW wins when set', () => {
@@ -360,6 +384,67 @@ test('end-to-end: inside a git repo the branch shows in the ⎇ segment', () => 
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
   });
   assert.match(out, /📁 [^⎇]+⎇ feature-x ·/);
+});
+
+test('end-to-end: git-counts flag OFF (default) → branch only, no ↑↓± suffix even when dirty', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  execFileSync('git', ['-C', work, 'init', '-b', 'feature-x'], { stdio: 'ignore' });
+  fs.writeFileSync(path.join(work, 'dirty.txt'), 'x'); // untracked → would be a ±1 under porcelain
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }, // no CLEPSYDRE_GIT_COUNTS
+  });
+  assert.match(out, /⎇ feature-x ·/); // branch shown, immediately followed by the gauge separator
+  assert.doesNotMatch(out, /[↑↓±]/); // the cheap default path never spends a working-tree scan
+});
+
+test('end-to-end: git-counts flag ON → the ↑↓± suffix shows alongside the branch in a dirty repo', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  execFileSync('git', ['-C', work, 'init', '-b', 'feature-x'], { stdio: 'ignore' });
+  fs.writeFileSync(path.join(work, 'dirty.txt'), 'x'); // untracked → ±1
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '1' },
+  });
+  assert.match(out, /⎇ feature-x \x1B\[33m±1\x1B\[0m ·/); // branch + orange ±1 before the gauge
+});
+
+test('end-to-end: git-counts flag ON but NOT a git repo → full line still renders, git segment just absent', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-')); // not a git repo
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '1' },
+  });
+  // A git failure with counts ON costs only the git segment: the rest of the bar is intact.
+  assert.equal(
+    out,
+    `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 65.3k/1.0M (6%)${RESET}` +
+      ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}\n`,
+  );
 });
 
 test('end-to-end: piping Claude Code JSON prints the composed status line', () => {
