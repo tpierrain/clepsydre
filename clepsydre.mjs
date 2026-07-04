@@ -95,17 +95,33 @@ export function pct(used, max) {
 
 const RESET = '\x1b[0m';
 
+// Compact git state suffix for the branch segment: ↑ahead (commits to push), ↓behind
+// (commits to pull), ±dirty (uncommitted changes — tracked edits + untracked files).
+// Each part is shown only when non-zero; an all-zero (clean, in-sync) repo returns ''
+// so the branch segment stays uncluttered.
+export function gitCounts(ahead = 0, behind = 0, dirty = 0) {
+  const parts = [];
+  if (ahead > 0) parts.push(`↑${ahead}`);
+  if (behind > 0) parts.push(`↓${behind}`);
+  if (dirty > 0) parts.push(`±${dirty}`);
+  return parts.join(' ');
+}
+
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
-// fs or git here). `mem` is { mdBytes, dirBytes, fileCount } — the live path always
-// passes one (readMemory returns zeros for an empty/absent folder, so the segment is
-// always shown). A null `mem` omits the segment: a convenience for focused unit tests
-// that don't care about memory. Mirrors the bash assembly order and separators.
-export function buildStatusLine({ model, basename, branch, used, max, mem, thresholds }) {
+// fs or git here). `git` is { branch, ahead, behind, dirty } and `mem` is
+// { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
+// return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
+// segment: a convenience for focused unit tests. Mirrors the bash assembly order.
+export function buildStatusLine({ model, basename, git, used, max, mem, thresholds }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
   let out = `[${model}] 📁 ${basename}`;
-  if (branch) out += ` ⎇ ${branch}`;
+  if (git?.branch) {
+    out += ` ⎇ ${git.branch}`;
+    const counts = gitCounts(git.ahead, git.behind, git.dirty);
+    if (counts) out += ` ${ORANGE}${counts}${RESET}`;
+  }
   out += ` · ${tok}`;
   if (mem) {
     const m = memTier(mem.mdBytes, t.mem);
@@ -162,15 +178,41 @@ export function readMemory(memDir) {
   return { mdBytes, dirBytes, fileCount };
 }
 
-// Current git branch, or '' outside a repo (silent) — mirrors the bash guard.
-function gitBranch(dir) {
-  if (!dir) return '';
+// Pure parse of `git status --porcelain=v2 --branch` output → { branch, ahead, behind,
+// dirty }. branch is '' when detached; ahead/behind are 0 when there's no upstream (the
+// `# branch.ab` header is then absent); dirty counts every changed path. Kept separate
+// from the spawn so the fragile header/regex/counter logic is unit-tested in isolation,
+// like readMemory. Parsing '' yields the all-zero shape (used as the no-repo fallback).
+export function parseGitStatus(out) {
+  const headHeader = '# branch.head ';
+  let branch = '', ahead = 0, behind = 0, dirty = 0;
+  for (const line of out.split('\n')) {
+    if (line.startsWith(headHeader)) {
+      const b = line.slice(headHeader.length).trim();
+      branch = b === '(detached)' ? '' : b;
+    } else if (line.startsWith('# branch.ab ')) {
+      // "# branch.ab +2 -0" → ahead 2, behind 0
+      const m = line.match(/\+(\d+)\s+-(\d+)/);
+      if (m) { ahead = Number(m[1]); behind = Number(m[2]); }
+    } else if (line && line[0] !== '#') {
+      dirty++; // one entry per changed path (1/2/u tracked, ? untracked)
+    }
+  }
+  return { branch, ahead, behind, dirty };
+}
+
+// Current git state via a SINGLE `status --porcelain=v2 --branch` spawn — one spawn feeds
+// the whole segment (branch + ahead/behind + dirty), cheaper than one call per datum on
+// this hot path. Returns the zeroed shape outside a work tree / when git is absent.
+function gitInfo(dir) {
+  const empty = { branch: '', ahead: 0, behind: 0, dirty: 0 };
+  if (!dir) return empty;
   try {
-    // `branch --show-current` already exits non-zero outside a work tree (→ '' via the
-    // catch), so no separate rev-parse guard is needed — one spawn on this hot path.
-    return execFileSync('git', ['-C', dir, 'branch', '--show-current'], { encoding: 'utf8' }).trim();
+    return parseGitStatus(
+      execFileSync('git', ['-C', dir, 'status', '--porcelain=v2', '--branch'], { encoding: 'utf8' }),
+    );
   } catch {
-    return '';
+    return empty; // outside a work tree / git absent — segment silently disappears
   }
 }
 
@@ -193,10 +235,11 @@ export function main() {
     input.transcript_path && input.transcript_path !== 'null' ? input.transcript_path : '';
   const mem = readMemory(computeMemDir(transcript, dir, os.homedir()));
 
+  const git = gitInfo(dir);
   const line = buildStatusLine({
     model,
     basename: path.basename(dir),
-    branch: gitBranch(dir),
+    git,
     used,
     max,
     mem,

@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   fmtTokens, fmtBytes, tokenTier, memTier, resolveMax, pct, buildStatusLine,
-  computeMemDir, readMemory, resolveThresholds,
+  computeMemDir, readMemory, resolveThresholds, gitCounts, parseGitStatus,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -176,7 +176,7 @@ test('pct: guards against a zero denominator', () => {
 
 test('buildStatusLine: model, folder and the colored token gauge (no branch, no memory)', () => {
   const line = buildStatusLine({
-    model: 'Opus 4.8', basename: 'my-project', branch: '',
+    model: 'Opus 4.8', basename: 'my-project',
     used: 65300, max: 230000, mem: null,
   });
   assert.equal(line, `[Opus 4.8] 📁 my-project · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`);
@@ -184,15 +184,73 @@ test('buildStatusLine: model, folder and the colored token gauge (no branch, no 
 
 test('buildStatusLine: a git branch adds a ⎇ segment before the gauge', () => {
   const line = buildStatusLine({
-    model: 'Opus 4.8', basename: 'my-project', branch: 'main',
+    model: 'Opus 4.8', basename: 'my-project', git: { branch: 'main' },
     used: 65300, max: 230000, mem: null,
   });
   assert.equal(line, `[Opus 4.8] 📁 my-project ⎇ main · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`);
 });
 
+test('parseGitStatus: branch, ahead/behind and dirty from porcelain-v2 output', () => {
+  const out = [
+    '# branch.oid abc123',
+    '# branch.head main',
+    '# branch.upstream origin/main',
+    '# branch.ab +2 -3',
+    '1 .M N... 100644 100644 100644 aaa bbb file-modified.txt',
+    '2 R. N... 100644 100644 100644 ccc ddd R100 new.txt\told.txt',
+    'u UU N... 100644 100644 100644 100644 eee fff ggg conflict.txt',
+    '? untracked.txt',
+    '',
+  ].join('\n');
+  assert.deepEqual(parseGitStatus(out), { branch: 'main', ahead: 2, behind: 3, dirty: 4 });
+});
+
+test('parseGitStatus: no upstream → ahead/behind stay 0 (no branch.ab header)', () => {
+  const out = '# branch.head feature-x\n';
+  assert.deepEqual(parseGitStatus(out), { branch: 'feature-x', ahead: 0, behind: 0, dirty: 0 });
+});
+
+test('parseGitStatus: detached HEAD → empty branch', () => {
+  const out = '# branch.oid abc123\n# branch.head (detached)\n# branch.ab +0 -0\n';
+  assert.deepEqual(parseGitStatus(out), { branch: '', ahead: 0, behind: 0, dirty: 0 });
+});
+
+test('parseGitStatus: empty input yields the all-zero fallback shape', () => {
+  assert.deepEqual(parseGitStatus(''), { branch: '', ahead: 0, behind: 0, dirty: 0 });
+});
+
+test('gitCounts: shows only non-zero parts, clean+synced → empty string', () => {
+  assert.equal(gitCounts(0, 0, 0), '');
+  assert.equal(gitCounts(2, 0, 0), '↑2');
+  assert.equal(gitCounts(0, 3, 0), '↓3');
+  assert.equal(gitCounts(0, 0, 8), '±8');
+  assert.equal(gitCounts(2, 3, 8), '↑2 ↓3 ±8');
+});
+
+test('buildStatusLine: ahead/behind/dirty add an orange git-counts suffix after the branch', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'my-project',
+    git: { branch: 'main', ahead: 2, behind: 0, dirty: 8 },
+    used: 65300, max: 230000, mem: null,
+  });
+  assert.equal(
+    line,
+    `[Opus 4.8] 📁 my-project ⎇ main ${ORANGE}↑2 ±8${RESET} · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`,
+  );
+});
+
+test('buildStatusLine: no branch means the git-counts suffix is never shown', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'p',
+    git: { branch: '', ahead: 5, behind: 5, dirty: 5 },
+    used: 1000, max: 230000, mem: null,
+  });
+  assert.equal(line, `[Opus 4.8] 📁 p · ${GREEN}🧠 1.0k/230.0k (0%)${RESET}`);
+});
+
 test('buildStatusLine: a memory folder appends the colored MEMORY.md weight segment', () => {
   const line = buildStatusLine({
-    model: 'Opus 4.8', basename: 'my-project', branch: 'main',
+    model: 'Opus 4.8', basename: 'my-project', git: { branch: 'main' },
     used: 65300, max: 230000,
     mem: { mdBytes: 4300, dirBytes: 18432, fileCount: 12 },
   });
@@ -206,7 +264,7 @@ test('buildStatusLine: a memory folder appends the colored MEMORY.md weight segm
 test('buildStatusLine: honors custom thresholds for the token gauge color', () => {
   // 180k would be orange under the defaults; with a higher warn it stays green.
   const line = buildStatusLine({
-    model: 'Opus 4.8', basename: 'p', branch: '',
+    model: 'Opus 4.8', basename: 'p',
     used: 180000, max: 400000, mem: null,
     thresholds: { token: { warn: 190000, crazy: 250000 }, mem: { warn: 15360, rot: 25600 } },
   });
