@@ -48,6 +48,15 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 - **Memory weight** — size of `MEMORY.md` (reloaded in full every session) and the memory folder:
   - 🧩 green < 15K · ⚠️ orange 15–25K · 🧨 red ≥ 25K
 
+Plenty of headroom — 🧠 green, you're fine:
+
+![Clepsydre status line, green tier: 129.6k/400.0k (32%)](assets/statusline-green.png)
+
+Deep in the stupidity zone — 🤪 bold red, `/clear` now:
+
+![Clepsydre status line, red tier: 244.6k/400.0k (61%)](assets/statusline-red.png)
+
+
 ### How to read it, piece by piece
 
 Reading the example line above from left to right:
@@ -62,14 +71,6 @@ Reading the example line above from left to right:
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
 | `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
 | `mem 18.0K/12f` | The **whole memory folder**: `18.0K` total across every memory file, `12f` = **12 files**. Reads on demand, so it doesn't cost context the way `MEMORY.md` does — this is just its footprint on disk. |
-
-Plenty of headroom — 🧠 green, you're fine:
-
-![Clepsydre status line, green tier: 129.6k/400.0k (32%)](assets/statusline-green.png)
-
-Deep in the stupidity zone — 🤪 bold red, `/clear` now:
-
-![Clepsydre status line, red tier: 244.6k/400.0k (61%)](assets/statusline-red.png)
 
 ## Why it matters
 
