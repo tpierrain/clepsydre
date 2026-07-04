@@ -13,10 +13,10 @@ status-line render, so on a large repo it is paid every turn.
 
 ## Tracking
 
-- [ ] **1. Review comment on PR #1** — tell Guillaume the merge is accepted, gated behind a
-      config opt-in for now, with the phase-2 plan to make it default-on.
-  - [ ] Post the ready-to-send comment below on https://github.com/tpierrain/clepsydre/pull/1
-        (English, as-is or lightly edited).
+- [x] **1. Review comment on PR #1** — tell Guillaume the merge is accepted, gated behind a
+      config opt-in for now, with the phase-2 plan to make it default-on. _(2026-07-04 · comment #4881047267)_
+  - [x] Post the ready-to-send comment below on https://github.com/tpierrain/clepsydre/pull/1
+        (English, as-is or lightly edited). Reworded to a warmer, non-judgmental tone before posting.
 
   > ```text
   > Thanks for this — genuinely strong PR. Clean altitude (a pure, unit-tested
@@ -51,19 +51,20 @@ status-line render, so on a large repo it is paid every turn.
 
 - [ ] **2. Merge PR #1 behind an opt-in flag** — the git feature is present at install, default
       OFF, enableable by config. TDD (production code → tests first).
-  - [ ] Add a `CLEPSYDRE_GIT_COUNTS` flag read from the env (like the `CLEPSYDRE_*` thresholds:
+  - [x] Add a `CLEPSYDRE_GIT_COUNTS` flag read from the env (like the `CLEPSYDRE_*` thresholds:
         global via `~/.claude/settings.json`, per-project override via `<project>/.claude/settings.json`).
-        Off/absent/`0` → disabled; `1`/truthy → enabled.
-  - [ ] **Keep the cheap path by default.** When disabled: branch only, via `git branch
+        Off/absent/`0` → disabled; `1`/truthy (`1`/`true`/`yes`/`on`, any case) → enabled.
+  - [x] **Keep the cheap path by default.** When disabled: branch only, via `git branch
         --show-current` (today's O(1) behavior — no working-tree scan). When enabled: the PR's
         single `git status --porcelain=v2 --branch` for branch + ↑↓±. Both paths stay error-safe
-        (catch → zeroed shape → never a blank line).
-  - [ ] TDD the flag resolution + the two gitInfo paths; keep @guillaumejay's `parseGitStatus`
-        / `gitCounts` tests. Suite green.
-  - [ ] **Installer (`install.mjs`)**: during install, explain the flag — what it shows (↑↓±) and
+        (catch → zeroed shape → never a blank line). **Extra hardening (Thomas's ask):** counts ON
+        but the porcelain scan fails → degrade to branch-only, never lose the branch or the line.
+  - [x] TDD the flag resolution + the two gitInfo paths; keep @guillaumejay's `parseGitStatus`
+        / `gitCounts` tests. Suite green (58 tests).
+  - [x] **Installer (`install.mjs`)**: during install, explain the flag — what it shows (↑↓±) and
         how to turn it on (`CLEPSYDRE_GIT_COUNTS=1`), globally or per-project. Suggest, don't force.
-  - [ ] **README**: document the flag in the "Customize" area (default off for now; will become
-        default-on later).
+  - [x] **README**: document the flag ("Show git ahead/behind/dirty counts (optional)"), add a
+        "How to read it, piece by piece" anatomy, and make the "Update" section general-public.
   - [ ] Merge the PR, keep authorship credit to @guillaumejay.
 
 - [ ] **3. Benchmark `git status` on a very large repo** — measure before building any async
