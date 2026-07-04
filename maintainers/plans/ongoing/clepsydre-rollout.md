@@ -72,26 +72,42 @@ status-line render, so on a large repo it is paid every turn.
   > **Next after `/clear`:** resume at step 3 below (the `git status` benchmark). Everything
   > above is shipped and on `main`.
 
-- [ ] **3. Benchmark `git status` on a very large repo** — measure before building any async
-      machinery ("avant qu'on fasse une usine à gaz"). Record the numbers back here.
-  - [ ] Pick a genuinely huge public repo (candidate: `torvalds/linux`, ~80k files; or
-        `NixOS/nixpkgs`). A `--depth 1` shallow clone still has the full working tree, so
-        `git status` latency is representative while keeping the download small.
-  - [ ] Measure warm + cold: `time git status`, and `time git status --porcelain=v2 --branch`,
-        on `main`.
-  - [ ] Repeat on another branch (`git switch -c bench` / checkout a tag) and with a dirty
-        working tree (touch a few files), to see the spread.
-  - [ ] Write the observed latencies (cold/warm, main/other, clean/dirty) into this file.
+- [x] **3. Benchmark `git status` on a very large repo** — DONE _(2026-07-04)_. Measured before
+      building any async machinery ("avant qu'on fasse une usine à gaz"). **Verdict: the cost is
+      entirely a function of working-tree size — ~240 ms warm / ~570 ms cold on the Linux kernel
+      (~95k files), but ~0 ms on a normal repo.** Numbers below.
+  - [x] Picked `torvalds/linux` (`--depth 1` shallow clone, ~26 s download; full working tree,
+        94,836 tracked files). Representative worst case for a working-tree scan.
+  - [x] Measured warm + cold on Apple Silicon (arm64, 14 cores, APFS SSD — a *best* case vs
+        Windows, where FS scan + antivirus are typically slower):
 
-- [ ] **4. Decide the default from the benchmark** — one of two paths, then ship on-by-default.
-  - [ ] **If fast enough** (render stays snappy on the big repo) → flip `CLEPSYDRE_GIT_COUNTS`
-        to default-ON, i.e. an **opt-out** (`=0` disables). Update installer + README wording.
-  - [ ] **If too slow** → build the async **cache + background refresh**: render instantly from a
-        cached git-state file, refresh it in a detached background process for the next render
-        (`spawn(..., { detached: true, stdio: 'ignore', windowsHide: true }).unref()`, atomic
-        write, anti-overlap guard), plus a `refreshInterval` so idle sessions still update. Then
-        ship default-ON. (True "update the same line async" is impossible — the status line is a
-        one-shot process; this cache pattern is the documented substitute.)
+        | Path | linux (~95k files) | normal repo (~17 files) |
+        |---|---|---|
+        | `git branch --show-current` (cheap, default OFF) | ~0 ms | ~0 ms |
+        | `git status --porcelain=v2 --branch` (git-counts) | **~240 ms warm / ~570 ms cold** | ~0 ms |
+        | `git status` (plain, reference) | ~240 ms warm | — |
+
+  - [x] Repeated on another branch and with a dirty tree (63 modified + 50 untracked): **no
+        material effect — ~240 ms in every state.** The dominant cost is the `lstat` sweep over
+        ~95k files; branch/dirtiness/untracked don't move it.
+  - [x] Interpretation: the cheap `git branch --show-current` path is genuinely free everywhere.
+        The git-counts path is free on normal repos but costs up to ~0.24–0.57 s **per render** on
+        a huge monorepo — paid every turn, likely worse on Windows. This is exactly the "the gauge
+        costs you nothing" risk that gated the opt-in. → feeds the step-4 decision.
+
+- [x] **4. Decide the default from the benchmark** — DONE _(2026-07-04)_. Chose the "fast enough"
+      path: **flip to default-ON (opt-out)**, no async machinery. Decision recorded in
+      [`../../docs/adr/0001-git-counts-default-on.md`](../../docs/adr/0001-git-counts-default-on.md).
+  - [x] **Fast enough** (render stays snappy: ~0 ms on normal repos, ~0.24 s on the 95k-file
+        kernel) → flipped `CLEPSYDRE_GIT_COUNTS` to **default-ON**, an **opt-out** (`=0`/`false`/
+        `no`/`off` disables). TDD in `clepsydre.mjs` (`resolveGitCounts` inverted to an OFF-set;
+        59 tests green). Updated installer tip + README wording (`↑↓±` on by default, opt-out).
+  - [x] **Not the "too slow" path** → deliberately did **not** build the async cache + background
+        refresh ("usine à gaz"): the benchmark showed the plain synchronous scan is cheap enough.
+        The cache pattern stays available as a future step if a field report ever demands it (see
+        ADR "Consequences → Reversible").
+  - [ ] Commit the flip + docs, then cut the release (MINOR) — "The One That…" naming, with a
+        dedication thanking @guillaumejay for the idea and contribution.
 
 - [ ] **5. Roll out to the other machines (Mac + Windows)** — the cross-platform confirmation.
   - [ ] `git clone git@github.com:tpierrain/clepsydre.git ~/clepsydre` (home by default — avoid

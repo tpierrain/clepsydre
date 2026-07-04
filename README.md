@@ -66,7 +66,7 @@ Reading the example line above from left to right:
 | `[Opus 4.8]` | The **model** currently answering you. |
 | `📁 my-project` | The **folder** (project) you're working in. |
 | `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Outside a repo, this whole part just disappears. |
-| `↑2 ↓1 ±8` | **Git state** — *optional, off by default* (see [git counts](#show-git-aheadbehinddirty-counts-optional)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
+| `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
 | `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
@@ -221,9 +221,9 @@ Set only the ones you care about; the rest keep their defaults. Anything empty,
 non-numeric, or non-positive is ignored, and a pair whose `WARN` isn't below its
 `CRAZY`/`ROT` quietly reverts to its defaults — a bad value can never break the gauge.
 
-## Show git ahead/behind/dirty counts (optional)
+## Git ahead/behind/dirty counts (on by default, opt-out)
 
-Off by default, one opt-in env var turns on a compact git state suffix after the branch:
+A compact git state suffix shows after the branch, out of the box:
 
 ```
 [Opus 4.8] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · …
@@ -235,25 +235,27 @@ Off by default, one opt-in env var turns on a compact git state suffix after the
 
 | Env var | Default | What it does |
 | --- | --- | --- |
-| `CLEPSYDRE_GIT_COUNTS` | *(off)* | `1` (or `true`/`yes`/`on`) shows the ↑↓± suffix |
+| `CLEPSYDRE_GIT_COUNTS` | *(on)* | `0` (or `false`/`no`/`off`) hides the ↑↓± suffix and falls back to a cheap branch-only read |
 
-Set it in the same `"env"` block, globally or per-project (see above):
+To **opt out** — e.g. on a very large monorepo — set it in the same `"env"` block, globally
+or per-project (see above):
 
 ```json
 {
   "env": {
-    "CLEPSYDRE_GIT_COUNTS": "1"
+    "CLEPSYDRE_GIT_COUNTS": "0"
   }
 }
 ```
 
-**Why it's off by default (for now).** Showing the branch alone is cheap — it just reads a
-ref. The counts need `git status`, which scans the whole working tree *on every render*, so
-on a very large repo that cost is paid every turn. Clepsydre's pitch is that the gauge costs
-you nothing, so the scan is opt-in while its cost is measured — it's slated to become the
-default (opt-out) once that's settled. Either way it's robust: if git ever fails with the
-counts on, the line falls back to the plain branch and the rest of the status line is never
-affected.
+**Why on by default, and when to opt out.** The counts need `git status`, which scans the
+whole working tree *on every render*. We benchmarked that scan: on a normal repo it's ~0 ms,
+and even on the Linux kernel (~95k files) it stays around ~0.24 s warm — cheap enough that the
+counts are worth having on by default (full numbers and rationale in
+[`maintainers/docs/adr/0001-git-counts-default-on.md`](maintainers/docs/adr/0001-git-counts-default-on.md)).
+On a genuinely huge monorepo where that per-render cost bites, opt out with `=0` and the branch
+still shows via a cheap ref read. Either way it's robust: if git ever fails with the counts on,
+the line falls back to the plain branch and the rest of the status line is never affected.
 
 ## Requirements
 

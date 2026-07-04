@@ -88,14 +88,14 @@ export function resolveThresholds(env = {}) {
   };
 }
 
-// Resolve the git-counts opt-in flag from the environment. Off by default: enabled only
-// by an explicit truthy value (1/true/yes/on, any case). Anything else — absent, empty,
-// 0/false/no/off, garbage — keeps it disabled, so the cheap branch-only path stays the
-// default (see gitInfo). Read from process.env like the CLEPSYDRE_* thresholds, so it can
-// be set globally (~/.claude/settings.json) or per-project (<project>/.claude/settings.json).
-const GIT_COUNTS_ON = new Set(['1', 'true', 'yes', 'on']);
+// Resolve the git-counts flag from the environment. ON by default (see the benchmark ADR):
+// the ↑↓± counts show unless explicitly opted OUT with a falsy value (0/false/no/off, any
+// case). Anything else — absent, empty, 1/true/yes/on, garbage — keeps it enabled. Read from
+// process.env like the CLEPSYDRE_* thresholds, so it can be turned off globally
+// (~/.claude/settings.json) or per-project (<project>/.claude/settings.json).
+const GIT_COUNTS_OFF = new Set(['0', 'false', 'no', 'off']);
 export function resolveGitCounts(env = {}) {
-  return GIT_COUNTS_ON.has(String(env.CLEPSYDRE_GIT_COUNTS ?? '').trim().toLowerCase());
+  return !GIT_COUNTS_OFF.has(String(env.CLEPSYDRE_GIT_COUNTS ?? '').trim().toLowerCase());
 }
 
 // Integer percentage of the working window used, truncated (bash `USED*100/MAX`).

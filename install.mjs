@@ -24,15 +24,16 @@ const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 
 const say = (s) => process.stdout.write(s + '\n');
 
-// Optional feature, suggested (not forced): the git ahead/behind/dirty counts. Off by
-// default so the status line stays instant; explain here how to opt in.
+// The git ahead/behind/dirty counts — ON by default (a working-tree scan measured cheap
+// on normal repos; see the benchmark ADR). Explain here how to opt OUT on a huge monorepo.
 const gitCountsTip = () => {
   say('');
-  say('Optional — git counts after the branch (↑ahead ↓behind ±dirty):');
-  say('   Off by default: the branch shows via a cheap ref read, with no working-tree');
-  say('   scan, so the line stays instant. To turn the counts on, add to the "env" block');
-  say('   of your settings.json — globally (~/.claude/settings.json) or per-project');
-  say('   (<project>/.claude/settings.json):   "CLEPSYDRE_GIT_COUNTS": "1"');
+  say('Git counts after the branch (↑ahead ↓behind ±dirty): ON by default.');
+  say('   A single `git status` scan feeds them — cheap on a normal repo, but it grows');
+  say('   with the working-tree size. On a very large monorepo you can opt OUT (falls back');
+  say('   to a cheap branch-only ref read) by adding to the "env" block of your');
+  say('   settings.json — globally (~/.claude/settings.json) or per-project');
+  say('   (<project>/.claude/settings.json):   "CLEPSYDRE_GIT_COUNTS": "0"');
 };
 
 say('═══════════════════════════════════════════════════════════');
