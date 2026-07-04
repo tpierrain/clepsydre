@@ -4,6 +4,8 @@
 
 # 🏺 Clepsydre
 
+[![Latest release](https://img.shields.io/github/v/release/tpierrain/clepsydre?sort=semver&display_name=tag&label=latest&color=7c4dff&style=flat-square&logo=github&logoColor=white)](https://github.com/tpierrain/clepsydre/releases/latest)
+
 > **The tokens are rising — get out fast before the stupidity zone locks you in.**
 
 **An always-on gauge for your context window, built for the Claude Code CLI.** It
