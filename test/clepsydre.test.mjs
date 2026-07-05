@@ -196,9 +196,9 @@ test('buildStatusLine: a null resetIn drops the ↻ countdown, keeps the percent
   );
 });
 
-test('rateInfo: resets_at beyond the 60s clock-skew grace → { expired: true }, stale % dropped', () => {
+test('rateInfo: resets_at beyond the 60s clock-skew grace → pct nulled, stale % dropped', () => {
   const limits = { five_hour: { used_percentage: 92, resets_at: 1000 } };
-  assert.deepEqual(rateInfo(limits, 1061), { expired: true });
+  assert.deepEqual(rateInfo(limits, 1061), { pct: null, resetIn: null });
 });
 
 test('rateInfo: a reset within the grace keeps the normal shape (countdown clamps to 0m)', () => {
@@ -210,7 +210,7 @@ test('buildStatusLine: an expired rate window renders the green ⏳ reset marker
   const line = buildStatusLine({
     model: 'Opus 4.8', basename: 'p',
     used: 65300, max: 230000, mem: null,
-    rate: { expired: true },
+    rate: { pct: null, resetIn: null },
   });
   assert.equal(
     line,
