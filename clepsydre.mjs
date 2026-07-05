@@ -52,6 +52,13 @@ export function memTier(mdBytes, { warn = 15360, rot = 25600 } = {}) {
   return tier(mdBytes, warn, rot, ['🧩', '⚠️ ', '🧨']);
 }
 
+// 5h rate-window tier — ⏳ green below warn, ⚠️ orange warn–high, ⌛ bold-red (the
+// sand has run out) at or above high. Thresholds are percentages of the window,
+// defaulting to 70/90 but overridable by the caller (see resolveThresholds).
+export function rateTier(usedPct, { warn = 70, high = 90 } = {}) {
+  return tier(usedPct, warn, high, ['⏳', '⚠️ ', '⌛']);
+}
+
 // A finite, strictly-positive number parsed from `raw`, else `fallback`. Rejects
 // empty/whitespace, non-numeric, NaN, Infinity, zero and negatives — the single guard
 // shared by every "trust this value or fall back to a sane default" spot below.
@@ -82,20 +89,40 @@ export function resolveThresholds(env = {}) {
   };
   const [tWarn, tCrazy] = pair('CLEPSYDRE_TOKEN_WARN', 150000, 'CLEPSYDRE_TOKEN_CRAZY', 200000);
   const [mWarn, mRot] = pair('CLEPSYDRE_MEM_WARN', 15360, 'CLEPSYDRE_MEM_ROT', 25600);
+  const [rWarn, rHigh] = pair('CLEPSYDRE_RATE_WARN', 70, 'CLEPSYDRE_RATE_HIGH', 90);
   return {
     token: { warn: tWarn, crazy: tCrazy },
     mem: { warn: mWarn, rot: mRot },
+    rate: { warn: rWarn, high: rHigh },
   };
 }
 
-// Resolve the git-counts flag from the environment. ON by default (see the benchmark ADR):
-// the ↑↓± counts show unless explicitly opted OUT with a falsy value (0/false/no/off, any
-// case). Anything else — absent, empty, 1/true/yes/on, garbage — keeps it enabled. Read from
-// process.env like the CLEPSYDRE_* thresholds, so it can be turned off globally
-// (~/.claude/settings.json) or per-project (<project>/.claude/settings.json).
-const GIT_COUNTS_OFF = new Set(['0', 'false', 'no', 'off']);
+// Opt-out flag semantics shared by every default-ON feature toggle: enabled unless
+// explicitly opted OUT with a falsy value (0/false/no/off, any case). Anything else —
+// absent, empty, 1/true/yes/on, garbage — keeps it enabled. Read from process.env like
+// the CLEPSYDRE_* thresholds, so it can be turned off globally (~/.claude/settings.json)
+// or per-project (<project>/.claude/settings.json).
+const OPT_OUT = new Set(['0', 'false', 'no', 'off']);
+const enabledUnlessOptedOut = (raw) => !OPT_OUT.has(String(raw ?? '').trim().toLowerCase());
+
+// The git ↑↓± counts flag — ON by default (see the benchmark ADR).
 export function resolveGitCounts(env = {}) {
-  return !GIT_COUNTS_OFF.has(String(env.CLEPSYDRE_GIT_COUNTS ?? '').trim().toLowerCase());
+  return enabledUnlessOptedOut(env.CLEPSYDRE_GIT_COUNTS);
+}
+
+// The 5h rate-window segment flag — ON by default.
+export function resolveRateWindow(env = {}) {
+  return enabledUnlessOptedOut(env.CLEPSYDRE_RATE_WINDOW);
+}
+
+// Compact countdown for the rate-window reset: "2h13" (minutes zero-padded),
+// or just "45m" under an hour.
+export function fmtCountdown(seconds) {
+  const s = Math.max(0, seconds);
+  const h = Math.trunc(s / 3600);
+  const m = Math.trunc((s % 3600) / 60);
+  if (h === 0) return `${m}m`;
+  return `${h}h${String(m).padStart(2, '0')}`;
 }
 
 // Integer percentage of the working window used, truncated (bash `USED*100/MAX`).
@@ -117,12 +144,23 @@ export function gitCounts(ahead = 0, behind = 0, dirty = 0) {
   return parts.join(' ');
 }
 
+// Pure extraction of the 5h rate-window state from Claude Code's `rate_limits` input:
+// { pct, resetIn } (integer percent, seconds until reset) or null when unavailable —
+// the field only exists for Pro/Max subscribers, and only after the first API response,
+// so null means "omit the segment", never "0%".
+export function rateInfo(rateLimits, now) {
+  const w = rateLimits?.five_hour;
+  if (!w || typeof w.used_percentage !== 'number') return null;
+  const resetIn = typeof w.resets_at === 'number' ? w.resets_at - now : null;
+  return { pct: Math.trunc(w.used_percentage), resetIn };
+}
+
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
 // fs or git here). `git` is { branch, ahead, behind, dirty } and `mem` is
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, basename, git, used, max, mem, thresholds }) {
+export function buildStatusLine({ model, basename, git, used, max, mem, rate, thresholds }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
@@ -133,6 +171,12 @@ export function buildStatusLine({ model, basename, git, used, max, mem, threshol
     if (counts) out += ` ${ORANGE}${counts}${RESET}`;
   }
   out += ` · ${tok}`;
+  if (rate) {
+    const r = rateTier(rate.pct, t.rate);
+    out += ` · ${r.color}${r.icon} ${rate.pct}%`;
+    if (rate.resetIn !== null) out += ` ↻ ${fmtCountdown(rate.resetIn)}`;
+    out += RESET;
+  }
   if (mem) {
     const m = memTier(mem.mdBytes, t.mem);
     out += ` · ${m.color}${m.icon} MEMORY.md ${fmtBytes(mem.mdBytes)}` +
@@ -268,6 +312,9 @@ export function main() {
   const mem = readMemory(computeMemDir(transcript, dir, os.homedir()));
 
   const git = gitInfo(dir, resolveGitCounts(process.env));
+  const rate = resolveRateWindow(process.env)
+    ? rateInfo(input.rate_limits, Math.floor(Date.now() / 1000))
+    : null;
   const line = buildStatusLine({
     model,
     basename: path.basename(dir),
@@ -275,6 +322,7 @@ export function main() {
     used,
     max,
     mem,
+    rate,
     thresholds: resolveThresholds(process.env),
   });
   process.stdout.write(line + '\n');

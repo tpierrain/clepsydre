@@ -39,7 +39,7 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 ## What you see
 
 ```
-[Opus 4.8] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
+[Opus 4.8] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · ⏳ 23% ↻ 2h13 · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
 ```
 
 - **Model · folder · git branch**
@@ -47,6 +47,8 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
   - 🧠 green — you're fine
   - ⚠️ orange — ≥ 150k, ease off
   - 🤪 red — ≥ 200k, the stupidity zone, `/clear` now
+- **5-hour rate window** (Pro/Max plans) — how much of it you've burned, and when it resets:
+  - ⏳ green < 70% · ⚠️ orange 70–90% · ⌛ red ≥ 90%
 - **Memory weight** — size of `MEMORY.md` (reloaded in full every session) and the memory folder:
   - 🧩 green < 15K · ⚠️ orange 15–25K · 🧨 red ≥ 25K
 
@@ -71,6 +73,7 @@ Reading the example line above from left to right:
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
+| `⏳ 23% ↻ 2h13` | Your **5-hour rate window** (Pro/Max plans) — *on by default, opt-out* (see [rate window](#the-5-hour-rate-window-on-by-default-opt-out)). `23%` of the window already used, `↻ 2h13` until it resets. ⏳ green → ⚠️ orange (≥ 70%) → ⌛ red (≥ 90%). Not on a subscription plan? The segment simply doesn't show. |
 | `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
 | `mem 18.0K/12f` | The **whole memory folder**: `18.0K` total across every memory file, `12f` = **12 files**. Reads on demand, so it doesn't cost context the way `MEMORY.md` does — this is just its footprint on disk. |
 
@@ -194,7 +197,7 @@ up to roughly 300–400k. Pick what fits your context — Clepsydre will show it
 
 The tier colors flip at sensible defaults, but **changing a threshold is configuration,
 not code** — so you set it in your own `settings.json`, never by editing `clepsydre.mjs`
-(that file stays identical for everyone, so `git pull` keeps working). Four optional env
+(that file stays identical for everyone, so `git pull` keeps working). Six optional env
 vars, each defaulting to today's behavior:
 
 | Env var | Default | Tier it moves |
@@ -203,6 +206,8 @@ vars, each defaulting to today's behavior:
 | `CLEPSYDRE_TOKEN_CRAZY` | `200000` | ⚠️ → 🤪 (stupidity zone) |
 | `CLEPSYDRE_MEM_WARN` | `15360` | 🧩 → ⚠️ (`MEMORY.md`, bytes) |
 | `CLEPSYDRE_MEM_ROT` | `25600` | ⚠️ → 🧨 (`MEMORY.md`, bytes) |
+| `CLEPSYDRE_RATE_WARN` | `70` | ⏳ → ⚠️ (5h window, %) |
+| `CLEPSYDRE_RATE_HIGH` | `90` | ⚠️ → ⌛ (5h window, %) |
 
 **Where to set them:**
 
@@ -258,6 +263,37 @@ counts are worth having on by default (full numbers and rationale in
 On a genuinely huge monorepo where that per-render cost bites, opt out with `=0` and the branch
 still shows via a cheap ref read. Either way it's robust: if git ever fails with the counts on,
 the line falls back to the plain branch and the rest of the status line is never affected.
+
+## The 5-hour rate window (on by default, opt-out)
+
+On Claude Pro/Max subscription plans, usage is metered over a rolling **5-hour window**.
+Clepsydre shows where you stand, out of the box:
+
+```
+[Opus 4.8] 📁 my-project ⎇ main · 🧠 65.3k/230.0k (28%) · ⏳ 23% ↻ 2h13 · …
+```
+
+- **⏳ 23%** of the window already used · **↻ 2h13** until it resets (just `↻ 45m` under an
+  hour). The icon follows the usual traffic light: ⏳ green → ⚠️ orange (≥ 70%) → ⌛ red
+  (≥ 90%) — thresholds movable via `CLEPSYDRE_RATE_WARN` / `CLEPSYDRE_RATE_HIGH` (see above).
+- The data comes straight from the JSON Claude Code hands the status line — **no extra
+  process, no API call, zero added cost** per render.
+- **Not on Pro/Max** (API billing), or before the session's first response? Claude Code
+  doesn't send the numbers, and the segment simply doesn't show. Nothing to configure.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_RATE_WINDOW` | *(on)* | `0` (or `false`/`no`/`off`) hides the ⏳ 5h-window segment |
+
+To **opt out**, same `"env"` block as everything else, globally or per-project:
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_RATE_WINDOW": "0"
+  }
+}
+```
 
 ## Requirements
 
