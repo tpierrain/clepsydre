@@ -148,10 +148,17 @@ export function gitCounts(ahead = 0, behind = 0, dirty = 0) {
 // { pct, resetIn } (integer percent, seconds until reset) or null when unavailable —
 // the field only exists for Pro/Max subscribers, and only after the first API response,
 // so null means "omit the segment", never "0%".
+// The input only refreshes with an API response, so on an idle session it can outlive
+// its own reset: once `resets_at` is more than a clock-skew grace in the past, a NEW
+// 5h window has already started and the stale percentage would be a lie (a scary ⌛ 92%
+// when the real window is fresh). That state returns { expired: true } instead, rendered
+// as a plain "reset" marker until the next response brings fresh numbers.
+const RESET_GRACE_S = 60;
 export function rateInfo(rateLimits, now) {
   const w = rateLimits?.five_hour;
   if (!w || typeof w.used_percentage !== 'number') return null;
   const resetIn = typeof w.resets_at === 'number' ? w.resets_at - now : null;
+  if (resetIn !== null && resetIn < -RESET_GRACE_S) return { expired: true };
   return { pct: Math.trunc(w.used_percentage), resetIn };
 }
 
@@ -171,7 +178,11 @@ export function buildStatusLine({ model, basename, git, used, max, mem, rate, th
     if (counts) out += ` ${ORANGE}${counts}${RESET}`;
   }
   out += ` · ${tok}`;
-  if (rate) {
+  if (rate?.expired) {
+    // The window rolled over but no fresh numbers arrived yet (idle session): a plain
+    // green marker, never the stale — possibly scary-red — percentage.
+    out += ` · ${GREEN}⏳ reset${RESET}`;
+  } else if (rate) {
     const r = rateTier(rate.pct, t.rate);
     out += ` · ${r.color}${r.icon} ${rate.pct}%`;
     if (rate.resetIn !== null) out += ` ↻ ${fmtCountdown(rate.resetIn)}`;

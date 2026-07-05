@@ -280,6 +280,10 @@ Clepsydre shows where you stand, out of the box:
   process, no API call, zero added cost** per render.
 - **Not on Pro/Max** (API billing), or before the session's first response? Claude Code
   doesn't send the numbers, and the segment simply doesn't show. Nothing to configure.
+- **`⏳ reset`** — the numbers only refresh with a response, so if a session sits idle
+  past the reset, the last-known percentage is stale (a new window has already started).
+  Rather than show a scary, wrong ⌛, the segment turns into this green marker until your
+  next message brings fresh numbers.
 
 | Env var | Default | What it does |
 | --- | --- | --- |
