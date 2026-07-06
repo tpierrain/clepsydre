@@ -98,6 +98,15 @@ export function resolveGitCounts(env = {}) {
   return !GIT_COUNTS_OFF.has(String(env.CLEPSYDRE_GIT_COUNTS ?? '').trim().toLowerCase());
 }
 
+// Resolve the reasoning-effort flag from the environment. ON by default: the effort
+// segment shows unless explicitly opted OUT with a falsy value (0/false/no/off, any case),
+// mirroring resolveGitCounts. Read from process.env so it can be turned off globally
+// (~/.claude/settings.json) or per-project (<project>/.claude/settings.json).
+const EFFORT_OFF = new Set(['0', 'false', 'no', 'off']);
+export function resolveEffort(env = {}) {
+  return !EFFORT_OFF.has(String(env.CLEPSYDRE_EFFORT ?? '').trim().toLowerCase());
+}
+
 // Integer percentage of the working window used, truncated (bash `USED*100/MAX`).
 export function pct(used, max) {
   return max > 0 ? Math.trunc((used * 100) / max) : 0;
@@ -117,12 +126,21 @@ export function gitCounts(ahead = 0, behind = 0, dirty = 0) {
   return parts.join(' ');
 }
 
+// Pure extraction of the reasoning-effort level from Claude Code's `effort` input:
+// the level string (low|medium|high|xhigh|max) or null when unavailable — the field
+// only exists when the current model supports the effort parameter, so null means
+// "omit the segment", never a fabricated default.
+export function effortInfo(effort) {
+  const level = effort?.level;
+  return typeof level === 'string' && level.trim() !== '' ? level.trim() : null;
+}
+
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
 // fs or git here). `git` is { branch, ahead, behind, dirty } and `mem` is
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, basename, git, used, max, mem, thresholds }) {
+export function buildStatusLine({ model, basename, git, used, max, mem, effort, thresholds }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
@@ -132,6 +150,9 @@ export function buildStatusLine({ model, basename, git, used, max, mem, threshol
     const counts = gitCounts(git.ahead, git.behind, git.dirty);
     if (counts) out += ` ${ORANGE}${counts}${RESET}`;
   }
+  // Reasoning-effort level (💪) — informational, uncoloured (not a threshold gauge like
+  // the token/mem segments). A null effort (model without the effort parameter) omits it.
+  if (effort) out += ` · 💪 ${effort}`;
   out += ` · ${tok}`;
   if (mem) {
     const m = memTier(mem.mdBytes, t.mem);
@@ -268,6 +289,7 @@ export function main() {
   const mem = readMemory(computeMemDir(transcript, dir, os.homedir()));
 
   const git = gitInfo(dir, resolveGitCounts(process.env));
+  const effort = resolveEffort(process.env) ? effortInfo(input.effort) : null;
   const line = buildStatusLine({
     model,
     basename: path.basename(dir),
@@ -275,6 +297,7 @@ export function main() {
     used,
     max,
     mem,
+    effort,
     thresholds: resolveThresholds(process.env),
   });
   process.stdout.write(line + '\n');

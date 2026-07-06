@@ -39,10 +39,12 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 ## What you see
 
 ```
-[Opus 4.8] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
+[Opus 4.8] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 💪 high · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
 ```
 
 - **Model · folder · git branch**
+- **Reasoning effort** — the model's current effort level (`💪 low`/`medium`/`high`/`xhigh`/`max`),
+  reflecting live `/effort` changes. Absent when the model has no effort setting.
 - **Live token usage** vs your working window, colored by the anti-context-rot threshold:
   - 🧠 green — you're fine
   - ⚠️ orange — ≥ 150k, ease off
@@ -70,6 +72,7 @@ Reading the example line above from left to right:
 | `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Outside a repo, this whole part just disappears. |
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
+| `💪 high` | The model's current **reasoning effort** (`low`/`medium`/`high`/`xhigh`/`max`) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)). Tracks live `/effort` changes. Disappears when the current model has no effort setting. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
 | `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
 | `mem 18.0K/12f` | The **whole memory folder**: `18.0K` total across every memory file, `12f` = **12 files**. Reads on demand, so it doesn't cost context the way `MEMORY.md` does — this is just its footprint on disk. |
@@ -258,6 +261,33 @@ counts are worth having on by default (full numbers and rationale in
 On a genuinely huge monorepo where that per-render cost bites, opt out with `=0` and the branch
 still shows via a cheap ref read. Either way it's robust: if git ever fails with the counts on,
 the line falls back to the plain branch and the rest of the status line is never affected.
+
+## Reasoning effort (on by default, opt-out)
+
+A `💪` segment shows the model's current reasoning-effort level, out of the box:
+
+```
+[Opus 4.8] 📁 my-project ⎇ main · 💪 high · 🧠 65.3k/230.0k (28%) · …
+```
+
+- The level is one of `low`/`medium`/`high`/`xhigh`/`max`, read straight from Claude Code's
+  session data — it reflects live `/effort` changes with no extra work or API calls.
+- The segment **disappears** when the current model has no effort setting (the field is simply
+  absent), so it's never a fabricated or stale value.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_EFFORT` | *(on)* | `0` (or `false`/`no`/`off`) hides the 💪 effort segment |
+
+To **opt out**, set it in the same `"env"` block, globally or per-project (see above):
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_EFFORT": "0"
+  }
+}
+```
 
 ## Requirements
 
