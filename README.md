@@ -358,6 +358,21 @@ counts, the memory segment **and the rate window** — and hands **whatever is l
 branch names. If both fit, you see them in full; if not, the names shrink by exactly as much as the
 width demands — and no more.
 
+**How it resizes — the same line at three widths.** As the terminal narrows, only the folder and branch
+give ground; the token gauge, memory and rate window stay put the whole way down.
+
+*Wide — both names in full, everything visible:*
+
+![Clepsydre on a wide terminal, names in full: folder second-brain-generator, branch test/rag-mutation-hardening, all segments visible](assets/statusline-full.png)
+
+*Narrower — the names shrink (folder first, ellipsis in the middle), everything else untouched:*
+
+![Clepsydre on a medium terminal, names truncated: folder second…rator, branch test/r…ening, all segments still visible](assets/statusline-overview.png)
+
+*Genuinely tiny — the names collapse to their `📁 ⎇` icons, so the gauge, memory and rate window never have to go:*
+
+![Clepsydre on a narrow terminal, names collapsed to icons: folder icon, branch symbol ±6, gauge, MEMORY.md, mem and rate window all still visible](assets/statusline-collapsed.png)
+
 - **Everything else stays visible — the names are the only thing that shrinks.** Because the folder
   and branch are sized from what's left after *the whole rest of the line*, they can **never** push
   the gauge, the memory segment **or the rate window** off-screen — not even with pathologically long
