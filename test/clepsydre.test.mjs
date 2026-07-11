@@ -171,7 +171,7 @@ test('rateInfo: missing resets_at → pct alone, resetIn null (countdown omitted
     { pct: 50, resetIn: null });
 });
 
-test('buildStatusLine: the 5h rate-window segment sits between the gauge and memory', () => {
+test('buildStatusLine: the 5h rate-window segment is pinned to the far right, after memory (ADR 0002)', () => {
   const line = buildStatusLine({
     model: 'Opus 4.8', basename: 'p',
     used: 65300, max: 230000, mem: { mdBytes: 0, dirBytes: 0, fileCount: 0 },
@@ -180,8 +180,8 @@ test('buildStatusLine: the 5h rate-window segment sits between the gauge and mem
   assert.equal(
     line,
     `[Opus 4.8] 📁 p · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}` +
-      ` · ${GREEN}⏳ 23% ↻ 2h13${RESET}` +
-      ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}`,
+      ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}` +
+      ` · ${GREEN}⏳ 23% ↻ 2h13${RESET}`,
   );
 });
 
@@ -650,7 +650,7 @@ test('end-to-end: rate_limits in the payload → the ⏳ 5h-window segment shows
     encoding: 'utf8',
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
   });
-  assert.match(out, /· \x1B\[32m⏳ 23% ↻ 2h13\x1B\[0m ·/); // green, truncated %, between gauge and memory
+  assert.match(out, /· \x1B\[32m⏳ 23% ↻ 2h13\x1B\[0m\n$/); // green, truncated %, pinned far right (ADR 0002)
 });
 
 test('end-to-end: rate-window opted OUT (=0) → no ⏳ segment even with rate_limits present', () => {

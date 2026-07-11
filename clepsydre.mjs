@@ -125,17 +125,12 @@ export function fmtCountdown(seconds) {
   return `${h}h${String(m).padStart(2, '0')}`;
 }
 
-// Reasoning-effort segment — feature origin: @anaelChardan (PR #5). The contributor's opt-out
-// flag and null-omit logic are preserved verbatim; the maintainer only re-anchored the rendering
-// into the [model] bracket per ADR 0002.
-//
-// Resolve the reasoning-effort flag from the environment. ON by default: the effort
-// segment shows unless explicitly opted OUT with a falsy value (0/false/no/off, any case),
-// mirroring resolveGitCounts. Read from process.env so it can be turned off globally
-// (~/.claude/settings.json) or per-project (<project>/.claude/settings.json).
-const EFFORT_OFF = new Set(['0', 'false', 'no', 'off']);
+// The reasoning-effort segment flag — ON by default (feature origin: @anaelChardan, PR #5).
+// The contributor's opt-out flag and null-omit logic are preserved; the maintainer only
+// re-anchored the rendering into the [model] bracket (ADR 0002) and routed the flag through
+// the shared enabledUnlessOptedOut helper.
 export function resolveEffort(env = {}) {
-  return !EFFORT_OFF.has(String(env.CLEPSYDRE_EFFORT ?? '').trim().toLowerCase());
+  return enabledUnlessOptedOut(env.CLEPSYDRE_EFFORT);
 }
 
 // Integer percentage of the working window used, truncated (bash `USED*100/MAX`).
@@ -213,6 +208,14 @@ export function buildStatusLine({ model, basename, git, used, max, mem, effort, 
     if (counts) out += ` ${ORANGE}${counts}${RESET}`;
   }
   out += ` · ${tok}`;
+  if (mem) {
+    const m = memTier(mem.mdBytes, t.mem);
+    out += ` · ${m.color}${m.icon} MEMORY.md ${fmtBytes(mem.mdBytes)}` +
+      ` · mem ${fmtBytes(mem.dirBytes)}/${mem.fileCount}f${RESET}`;
+  }
+  // The 5h rate window is pinned to the far right (ADR 0002): it's the most sacrificable
+  // segment (plan-specific, furthest from the context-window mission), so it's the first
+  // thing the terminal clips on a narrow window — never at the token gauge's expense.
   if (rate) {
     // A null pct means the window rolled over but no fresh numbers arrived yet (idle
     // session): render the calm low tier with a plain "reset" marker, never the stale
@@ -221,11 +224,6 @@ export function buildStatusLine({ model, basename, git, used, max, mem, effort, 
     out += ` · ${r.color}${r.icon} ${rate.pct === null ? 'reset' : `${rate.pct}%`}`;
     if (rate.resetIn !== null) out += ` ↻ ${fmtCountdown(rate.resetIn)}`;
     out += RESET;
-  }
-  if (mem) {
-    const m = memTier(mem.mdBytes, t.mem);
-    out += ` · ${m.color}${m.icon} MEMORY.md ${fmtBytes(mem.mdBytes)}` +
-      ` · mem ${fmtBytes(mem.dirBytes)}/${mem.fileCount}f${RESET}`;
   }
   return out;
 }

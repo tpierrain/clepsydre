@@ -39,7 +39,7 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 ## What you see
 
 ```
-[Opus 4.8·H] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · ⏳ 23% ↻ 2h13 · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
+[Opus 4.8·H] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f · ⏳ 23% ↻ 2h13
 ```
 
 - **Model · reasoning effort · folder · git branch** — the effort level rides *inside* the model
@@ -50,10 +50,11 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
   - 🧠 green — you're fine
   - ⚠️ orange — ≥ 150k, ease off
   - 🤪 red — ≥ 200k, the stupidity zone, `/clear` now
-- **5-hour rate window** (Pro/Max plans) — how much of it you've burned, and when it resets:
-  - ⏳ green < 70% · ⚠️ orange 70–90% · ⌛ red ≥ 90%
 - **Memory weight** — size of `MEMORY.md` (reloaded in full every session) and the memory folder:
   - 🧩 green < 15K · ⚠️ orange 15–25K · 🧨 red ≥ 25K
+- **5-hour rate window** (Pro/Max plans) — how much of it you've burned, and when it resets; pinned
+  far right, so it's the first thing to clip on a narrow terminal:
+  - ⏳ green < 70% · ⚠️ orange 70–90% · ⌛ red ≥ 90%
 
 Plenty of headroom — 🧠 green, you're fine:
 
@@ -76,9 +77,9 @@ Reading the example line above from left to right:
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
-| `⏳ 23% ↻ 2h13` | Your **5-hour rate window** (Pro/Max plans) — *on by default, opt-out* (see [rate window](#the-5-hour-rate-window-on-by-default-opt-out)). `23%` of the window already used, `↻ 2h13` until it resets. ⏳ green → ⚠️ orange (≥ 70%) → ⌛ red (≥ 90%). Not on a subscription plan? The segment simply doesn't show. |
 | `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
 | `mem 18.0K/12f` | The **whole memory folder**: `18.0K` total across every memory file, `12f` = **12 files**. Reads on demand, so it doesn't cost context the way `MEMORY.md` does — this is just its footprint on disk. |
+| `⏳ 23% ↻ 2h13` | Your **5-hour rate window** (Pro/Max plans) — *on by default, opt-out* (see [rate window](#the-5-hour-rate-window-on-by-default-opt-out)). `23%` of the window already used, `↻ 2h13` until it resets. ⏳ green → ⚠️ orange (≥ 70%) → ⌛ red (≥ 90%). **Pinned far right** ([ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md)) — first to clip on a narrow terminal, so it never squeezes the token gauge. Not on a subscription plan? The segment simply doesn't show. |
 
 ## Why it matters
 
@@ -313,10 +314,12 @@ To **opt out**, set it in the same `"env"` block, globally or per-project (see a
 ## The 5-hour rate window (on by default, opt-out)
 
 On Claude Pro/Max subscription plans, usage is metered over a rolling **5-hour window**.
-Clepsydre shows where you stand, out of the box:
+Clepsydre shows where you stand, out of the box — **pinned to the far right** of the line, so
+it's the first segment the terminal clips on a narrow window and can never squeeze the token gauge
+([ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md)):
 
 ```
-[Opus 4.8] 📁 my-project ⎇ main · 🧠 65.3k/230.0k (28%) · ⏳ 23% ↻ 2h13 · …
+[Opus 4.8] 📁 my-project ⎇ main · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f · ⏳ 23% ↻ 2h13
 ```
 
 - **⏳ 23%** of the window already used · **↻ 2h13** until it resets (just `↻ 45m` under an
@@ -361,7 +364,7 @@ To **opt out**, same `"env"` block as everything else, globally or per-project:
 Clepsydre is better because people sent great ideas upstream. Huge thanks to:
 
 - **[@guillaumejay](https://github.com/guillaumejay)** — the **git `↑ahead ↓behind ±dirty`
-  counts** (on by default).
+  counts** (on by default) and the **5-hour rate-limit window** (`⏳ 23% ↻ 2h13`).
 - **[@anaelChardan](https://github.com/anaelChardan)** — the **reasoning-effort** indicator
   (`[Opus 4.8·H]`), surfacing your live `/effort` level right in the model bracket.
 
