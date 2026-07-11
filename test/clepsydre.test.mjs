@@ -12,6 +12,7 @@ import {
   fmtCountdown, rateTier, resolveRateWindow, rateInfo, compactModelName,
   truncateBranch, resolveBranchMax, truncateMiddle, resolveFolderMax,
   fmtWindowSize, resolveModelMax, displayWidth, allocateNameCaps,
+  resolveWidthReserve, usableColumns, shouldCollapseNames,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -1048,6 +1049,50 @@ test('allocateNameCaps: over budget, the folder yields first — branch fully pr
   );
 });
 
+test('allocateNameCaps: extreme narrow floors BOTH names (~5) so neither vanishes — overflow spills to the rate', () => {
+  // budget = 60 − 55 = 5, far below 2×floor → both names sit at the floor, never 0 (an empty
+  // 📁 …/⎇ … reads as broken). The line then overflows COLUMNS on purpose: the terminal clips the
+  // rightmost segment (the rate window) — never the gauge or memory (see ADR 0006).
+  assert.deepEqual(
+    allocateNameCaps({ columns: 60, overhead: 55, folderLen: 22, branchLen: 27 }),
+    { folderCap: 5, branchCap: 5 },
+  );
+});
+
+test('shouldCollapseNames: even the floored names (5+5) overflow COLUMNS → collapse to icons', () => {
+  // overhead 101 + floor 5 + floor 5 = 111 > 110 → the floored-stub form can't keep the tail
+  // visible, so the names collapse to their icons instead of rendering ugly "se…or" stubs.
+  assert.equal(shouldCollapseNames({ columns: 110, overhead: 101, folderLen: 22, branchLen: 27 }), true);
+});
+
+test('shouldCollapseNames: when the floored names still fit, keep the readable shrink (no collapse)', () => {
+  // overhead 101 + floor 5 + floor 5 = 111 ≤ 120 → the floored stubs fit, so we stay above the
+  // collapse threshold and let the names shrink normally instead.
+  assert.equal(shouldCollapseNames({ columns: 120, overhead: 101, folderLen: 22, branchLen: 27 }), false);
+});
+
+test('resolveWidthReserve: a safety margin under COLUMNS (statusLine padding + the ellipsis Claude Code adds), overridable, 0 disables', () => {
+  assert.equal(resolveWidthReserve({}), 8);                                  // default margin
+  assert.equal(resolveWidthReserve({ CLEPSYDRE_WIDTH_RESERVE: '4' }), 4);    // explicit override
+  assert.equal(resolveWidthReserve({ CLEPSYDRE_WIDTH_RESERVE: '0' }), 0);    // opt out entirely
+  assert.equal(resolveWidthReserve({ CLEPSYDRE_WIDTH_RESERVE: 'nope' }), 8); // non-numeric → default
+});
+
+test('usableColumns: COLUMNS minus the width reserve; absent/non-numeric COLUMNS → undefined (fixed-caps fallback)', () => {
+  assert.equal(usableColumns({ COLUMNS: '155' }), 147);                          // 155 − 8 default
+  assert.equal(usableColumns({ COLUMNS: '155', CLEPSYDRE_WIDTH_RESERVE: '0' }), 155); // reserve off
+  assert.equal(usableColumns({}), undefined);                                    // no COLUMNS → fallback
+  assert.equal(usableColumns({ COLUMNS: 'wat' }), undefined);                    // non-numeric → fallback
+});
+
+test('allocateNameCaps: folder-only (no branch) also floors under extreme narrow — never a bare 📁 …', () => {
+  // no branch → the folder is the sole flex; budget = 40 − 38 = 2, below the floor → folder floors at 5
+  assert.deepEqual(
+    allocateNameCaps({ columns: 40, overhead: 38, folderLen: 30, branchLen: 0 }),
+    { folderCap: 5, branchCap: 0 },
+  );
+});
+
 test('allocateNameCaps: an explicit cap is honoured and consumes its share; the auto name gets the rest', () => {
   // branch pinned at 12 (consumes 12 of the 40 budget) → folder auto gets the remaining 28
   assert.deepEqual(
@@ -1088,4 +1133,51 @@ test('buildStatusLine: pathologically long names on a wide terminal still never 
     used: 65300, max: 230000, mem: null, columns: 160,
   });
   assert.ok(displayWidth(line) <= 160, `line width ${displayWidth(line)} must fit 160 columns`);
+});
+
+test('buildStatusLine: a medium terminal keeps memory AND the rate window fully visible — names are the sole flex (ADR 0006)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', modelMax: '1M', effort: 'high',
+    basename: 'second-brain-generator',
+    git: { branch: 'test/rag-mutation-hardening', ahead: 0, behind: 0, dirty: 6 },
+    used: 90000, max: 300000,
+    mem: { mdBytes: 9100, dirBytes: 140000, fileCount: 40 },
+    rate: { pct: 42, resetIn: 5880 },
+    columns: 130,
+  });
+  assert.ok(displayWidth(line) <= 130, `line width ${displayWidth(line)} must fit 130 columns`);
+  assert.match(line, /MEMORY\.md/);      // memory stays fully visible — not pushed off by greedy names
+  assert.match(line, /42%/);             // the rate window stays visible (rightmost, still shown)
+  assert.match(line, /📁 \S*…\S* ⎇ /);   // the folder is truncated — the names absorb the deficit
+});
+
+test('buildStatusLine: an extreme-narrow terminal collapses the names to their icons (📁 ⎇ ±N), keeping the tail visible', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', modelMax: '1M', effort: 'high',
+    basename: 'second-brain-generator',
+    git: { branch: 'test/rag-mutation-hardening', ahead: 0, behind: 0, dirty: 6 },
+    used: 90000, max: 300000,
+    mem: { mdBytes: 9100, dirBytes: 140000, fileCount: 40 },
+    rate: { pct: 42, resetIn: 5880 },
+    columns: 100, // below the physical wall — even floored stubs (se…or) can't keep the tail visible
+  });
+  assert.ok(line.includes(`📁 ⎇ ${ORANGE}±6${RESET} · `)); // collapsed to icons + git status, then the gauge
+  assert.doesNotMatch(line, /second-brain/); // the folder text is gone (icon only), not an ugly stub
+  assert.doesNotMatch(line, /rag-mutation/); // the branch text is gone too
+  assert.match(line, /MEMORY\.md/);          // memory still there — the freed width keeps the tail
+});
+
+test('buildStatusLine: outside a git repo, an extreme-narrow terminal collapses to the folder icon alone (no ⎇)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', modelMax: '1M', effort: 'high',
+    basename: 'my-huge-project-folder-name', git: null,
+    used: 90000, max: 300000,
+    mem: { mdBytes: 9100, dirBytes: 140000, fileCount: 40 },
+    rate: { pct: 42, resetIn: 5880 },
+    columns: 70,
+  });
+  assert.ok(line.includes('📁 · '));          // just the folder icon, straight into the gauge
+  assert.doesNotMatch(line, /my-huge-project/); // the folder text is gone (icon only)
+  assert.doesNotMatch(line, /⎇/);              // no branch symbol when there's no repo
+  assert.match(line, /MEMORY\.md/);            // tail preserved
 });

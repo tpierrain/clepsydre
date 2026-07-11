@@ -1,9 +1,20 @@
 # 🏺 Clepsydre — responsive width caps (ongoing)
 
-> **Active plan.** Promoted from `prospective/` on 2026-07-11 (the rollout plan has only
-> human-only field checks left, no code). Resume at the first unchecked `- [ ]` in **Tracking**.
+> **Active plan.** Resume at the first unchecked `- [ ]` in **Tracking**.
 > Idea origin: Thomas, 2026-07-11 — *"could we read the terminal width and adapt, so we don't
 > truncate for nothing on a wide terminal?"*
+
+> 🛑 **STATE AS OF 2026-07-11 (read before doing anything — survives `/clear`):**
+> - **Uncommitted work** in `~/Dev/clepsydre` (`git status` shows `clepsydre.mjs`, `test/…`, README, ADR
+>   0006, this plan). **142 tests green.** NOT committed, NOT pushed, NOT released.
+> - **Thomas's statusLine is temporarily repointed** to `~/Dev/clepsydre/clepsydre.mjs`
+>   (`~/.claude/settings.json` → `statusLine.command`) so he can field-test the dev code live. **It MUST be
+>   reverted to `~/clepsydre/clepsydre.mjs` before any commit/release** (step 8f).
+> - **DONE: step 8i.D — name-collapse to icons** (`shouldCollapseNames` + `buildStatusLine` wiring, ADR 0006
+>   + README updated). Degradation ladder complete: full → shrink → `📁 ⎇ ±N` → clip.
+> - **NEXT ACTION = re-field-test on Mac with the collapse** (very narrow terminal shows `📁 ⎇ ±6`, not
+>   `se…or`), then **step 8f**: revert the statusLine repoint → commit → push → `gh release create v1.5.0`
+>   ("The One That Fits Your Terminal"). Pre-flight: English-only artifacts; suite green.
 
 ## Tracking
 
@@ -23,11 +34,85 @@
 - [x] **5. ADR** — [`0006`](../../docs/adr/0006-responsive-width-caps.md) rewritten (bands → budget), with a *History* note on the pivot _(2026-07-11)_.
 - [ ] **6. README + release** — MINOR bump, *"The One That…"*.
   - [x] Rewrite the "Responsive to your terminal width" section (bands table → budget explanation) _(2026-07-11)_.
-  - [ ] Commit the pivot.
-  - [ ] Bump version + publish the release (v1.5.0 candidate — see below).
-- [ ] **7. Field checks** — validate on real terminals (Mac + Windows, narrow + wide, long names).
+  - [x] Commit the pivot _(2026-07-11 · 9e32f06)_.
+  - [ ] Bump version + publish the release. **Decided (2026-07-11):** version **v1.5.0** (MINOR — new
+        user-facing feature), title **"The One That Fits Your Terminal"**. **Field-test FIRST** (step 7),
+        then `gh release create v1.5.0`.
+- [x] **7. Field checks (Mac)** — done 2026-07-11 via a temporary statusLine repoint to the dev checkout
+      (`~/.claude/settings.json` → `~/Dev/clepsydre/clepsydre.mjs`, to test the real code without shipping).
+      Live render confirms full names on wide terminals **and** revealed a design gap → step 8 below.
+      **The repoint MUST be reverted to `~/clepsydre/clepsydre.mjs` before push/release.**
+- [ ] **8. Redesign — everything always visible; names are the SOLE flex variable (Thomas, 2026-07-11)**.
+      The budget-that-only-protects-the-gauge let full names push memory + rate off-screen on medium
+      widths (102/127 cols field shots). New contract below. Then re-field-test, revert repoint, ship v1.5.0.
+  - [x] **8a. TDD `buildStatusLine` overhead now includes memory + rate** — tail built up front, measured
+        into the overhead so names fit *around* everything. 1 integration test (130 cols, all visible) _(2026-07-11)_.
+  - [x] **8b. TDD `allocateNameCaps` floors both names (5) — neither vanishes; overflow spills to rate**
+        `NAME_FLOOR` 8→5, folder floored (both-auto + single-auto paths); 2 unit tests (triangulated) _(2026-07-11)_.
+  - [x] **8c. Update ADR 0006** — overhead = *everything except the names*; names sole flex; memory/rate
+        protected; History note on the 2nd pivot _(2026-07-11)_.
+  - [x] **8d. Update README** — "Responsive to your terminal width" rewritten to the new contract _(2026-07-11)_.
+        136 tests green; smoke-tested 60→200 cols (all-visible ≥120, rate clips last below).
+  - [x] **8e. Field-test (Mac) revealed two things** _(2026-07-11)_:
+    - [x] **A width undercount** — the rate window was still clipped even at 155 cols where `displayWidth`
+          said the line fit. Cause: `COLUMNS` is the *raw* terminal width, but the status line loses columns
+          to Claude Code's `statusLine.padding` (Thomas's is `2`) + the ellipsis Claude Code adds when it
+          clips. → **step 8g**.
+    - [x] **A resize transient (not a bug)** — right after a resize the *first* render uses the stale
+          (pre-resize) `COLUMNS`, so names can look floored for one render, then correct on the next. This is
+          the documented "adapts on the next render" behaviour; no code change.
+  - [x] **8g. TDD a width reserve** — `resolveWidthReserve` (default 8, `CLEPSYDRE_WIDTH_RESERVE`, 0 disables)
+        + `usableColumns` = `COLUMNS − reserve`, wired into `main`. The whole line (rate included) now fits for
+        real in the realistic range (≥~120 cols); at 155 the rate window is fully visible again. 138 green _(2026-07-11)_.
+  - [x] **8h. Re-field-test with the reserve** _(2026-07-11)_: at **155 = OK** (everything incl. rate visible,
+        folder lightly cropped). But at **101 and 109 = KO**: names crushed to unreadable `se…or`/`te…ng`
+        (floor 5) AND the tail still clipped. → exposed the physical wall below.
+  - [ ] **8i. OPEN DECISION — graceful degradation below the physical wall (~119 cols).** Measured: the
+        **fixed content is 101 cols** (`[Opus 4.8 1M·H]` + ` ⎇ ` + ` ±6` + ` · 🧠 …(15%)` + ` · 🧩 MEMORY.md
+        9.1K · mem 140.0K/40f` + ` · ⏳ 1% ↺ 4h56`). Floored names (5+5) → min line 111, +8 reserve → needs
+        **~119 cols** to show all. Under that, "shrink names only" is impossible; a *fixed* segment must give.
+        Options put to Thomas (2026-07-11), **awaiting his answer** (he wants to clarify first):
+    - [x] **D. COLLAPSE the names to their icons (Thomas's call, 2026-07-11 — the chosen direction).**
+          When the terminal is *very* narrow, don't crush the names to ugly stubs (`se…or`): **drop the
+          folder AND branch text entirely**, keeping only the **folder icon `📁`** and the **git commit
+          status** (dirty `±N`, ahead/behind `↑↓`; keep the `⎇` symbol for context — *small open detail:
+          confirm whether `⎇` stays when there's no branch name*). Collapsed form ≈ `📁 ⎇ ±6`. This frees
+          ~40 cols at once, so gauge + memory + rate all stay visible far lower than the floor-stub allowed.
+          Degradation ladder: **wide** = full names → **medium** = names shrink (folder first) → **very
+          narrow** = names collapse to `📁 ⎇ ±6` → **extreme** = terminal clips the tail (rate first).
+    - [ ] ~~A/B/C earlier options~~ superseded by D (name-collapse), which Thomas proposed as cleaner than
+          flooring to `se…or` or dropping the memory/rate.
+    - [x] **TDD D:** a collapse threshold — when even the *shrunk* names can't keep everything visible, render
+          the icon-only form instead of a floored stub. Keep the readable behaviour above the threshold.
+          _(2026-07-11)_ Pure `shouldCollapseNames({columns, overhead, folderLen, branchLen})` (collapse when
+          `overhead + min(folderLen,5) + min(branchLen,5) > columns`), wired into `buildStatusLine`: renders
+          `📁 ⎇ ±N` (or `📁` outside a repo) below the wall. 4 tests (2 unit + 2 integration incl. no-branch),
+          142 green. Smoke-tested 80→200 cols: full → shrink → collapse (`📁 ⎇ ±6`, w=100 at ≤~110) → clip.
+          ADR 0006 + README updated with the collapse rung of the degradation ladder.
+  - [ ] **8f. Revert the statusLine repoint** (`~/.claude/settings.json` → `~/clepsydre/clepsydre.mjs`),
+        commit, then push + `gh release create v1.5.0`. **← the repoint revert is mandatory and easy to forget.**
 
-### Design (step 1) — dynamic width budget, folder yields first
+### Design (step 8, current) — everything always visible; names are the sole flex variable
+
+Thomas, 2026-07-11 (field-test): *"je veux que tout s'affiche tout le temps, y compris le budget temps à
+droite, et que pour y arriver, on réduise la partie répertoire et branche (seule variable d'ajustement)."*
+
+1. **overhead** = `displayWidth` of **everything except the folder/branch name characters** — model badge
+   + ` 📁 ` + ` ⎇ ` + git counts + ` · ` + the token gauge **+ the memory segment + the rate window**. The
+   tail (memory, rate) is fixed-length and always shown in full; only the names flex.
+2. **budget** = `COLUMNS − overhead` = the columns left for the two names combined.
+3. **Allocation** (folder yields first — confirmed 2026-07-11): both fit → both in full. Under pressure the
+   **branch is protected**, the **folder absorbs the deficit first**, and **both are floored (~5)** so
+   neither vanishes.
+4. **Extreme narrow** (even the floors don't fit): keep the names at their floor; the overflow is clipped
+   by the terminal from the **right = the rate window last** (confirmed 2026-07-11), never the gauge/memory.
+5. **Fallback** = today's fixed caps (12/12/25) when `COLUMNS` is absent/non-numeric — zero regression.
+6. **Explicit overrides win**: `CLEPSYDRE_BRANCH_MAX` / `CLEPSYDRE_FOLDER_MAX` (incl. `0`=uncap) honoured
+   as-is, consuming their share of the budget before the auto segments are allocated.
+
+_Supersedes the step-1 design below (which reserved only up to the gauge). History kept for the record._
+
+### Design (step 1, superseded) — dynamic width budget, folder yields first
 
 Caps are **derived from the actually-available width**, not from static bands:
 

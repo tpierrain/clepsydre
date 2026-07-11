@@ -353,20 +353,32 @@ Clepsydre **widens the names automatically** and stops truncating for nothing: `
 `second-brain-generator` once it fits.
 
 It does this by spending the *actually available* width, read from the terminal's `COLUMNS`: it
-measures how many columns everything else takes (the model badge, the token gauge, the git counts)
-and hands **whatever is left** to the folder and branch names. If both fit, you see them in full; if
-not, the names shrink by exactly as much as the width demands — and no more.
+measures how many columns **everything else** takes — the model badge, the token gauge, the git
+counts, the memory segment **and the rate window** — and hands **whatever is left** to the folder and
+branch names. If both fit, you see them in full; if not, the names shrink by exactly as much as the
+width demands — and no more.
 
-- **The token gauge is always protected.** Because the caps are derived from the leftover width, the
-  folder and branch can **never** push the gauge (or memory) off-screen — not even with
-  pathologically long names on a wide terminal. Under pressure the **branch is kept and the folder
-  yields first** (it's the more redundant of the two — you usually know which project you're in).
+- **Everything else stays visible — the names are the only thing that shrinks.** Because the folder
+  and branch are sized from what's left after *the whole rest of the line*, they can **never** push
+  the gauge, the memory segment **or the rate window** off-screen — not even with pathologically long
+  names. Under pressure the **branch is kept and the folder yields first** (it's the more redundant of
+  the two — you usually know which project you're in), and each keeps a small floor so neither
+  vanishes. On a genuinely tiny terminal, where even the floored names would just become unreadable
+  stubs, they **collapse to their icons** instead — `📁 ⎇ ±6` (folder icon + branch symbol + git
+  status), or just `📁` outside a repo — freeing their whole width so the gauge, memory *and* rate all
+  stay visible far lower. Only below *that* does the right-most rate window get clipped first — the
+  gauge is always the last to go.
 - **Zero regression, zero config.** If the width is unknown (`COLUMNS` absent or unreadable), you get
   exactly today's fixed caps (12 / 25). Nothing to set up.
 - **Your explicit caps still win.** A `CLEPSYDRE_BRANCH_MAX` / `CLEPSYDRE_FOLDER_MAX` you set (including
   `0` to show the name in full) overrides the automatic sizing for that segment.
+- **A small width reserve keeps the tail safe.** The status line doesn't get the *whole* terminal
+  width — your `statusLine.padding` indents it, and Claude Code adds its own ellipsis when a line is too
+  long. Clepsydre holds back a few columns (`CLEPSYDRE_WIDTH_RESERVE`, default `8`) so the rate window
+  is never clipped for it. Bump it if you use a large padding, or set `0` to reclaim every column.
 - **Adapts on the next render, not live.** Resize the terminal and the new width is picked up on the
-  **next** status-line render (each turn), not mid-drag.
+  **next** status-line render (each turn), not mid-drag — so right after a resize the first line may
+  look tight for a moment, then settle.
 
 See [ADR 0006](maintainers/docs/adr/0006-responsive-width-caps.md) for the design.
 

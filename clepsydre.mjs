@@ -282,6 +282,29 @@ export function resolveFolderMax(env = {}) {
   return override === null ? null : Math.trunc(override);
 }
 
+// Columns to hold back from COLUMNS before budgeting the names. COLUMNS is the raw terminal width,
+// but the status line never gets all of it: Claude Code's `statusLine.padding` indents it, and Claude
+// Code clips an over-long line with an ellipsis of its own — both eat columns the responsive budget
+// can't see. Reserving a small margin makes the WHOLE line (rate window included) fit for real, at the
+// cost of trimming the names a hair sooner — exactly the "over-crop the names, never clip the tail"
+// trade-off (ADR 0006). Field-tunable via CLEPSYDRE_WIDTH_RESERVE (0 disables); default fits a
+// padding of ~2.
+const DEFAULT_WIDTH_RESERVE = 8;
+export function resolveWidthReserve(env = {}) {
+  const raw = env.CLEPSYDRE_WIDTH_RESERVE;
+  if (raw === undefined || raw === null || String(raw).trim() === '') return DEFAULT_WIDTH_RESERVE;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : DEFAULT_WIDTH_RESERVE;
+}
+
+// The width the responsive budget may actually spend: COLUMNS minus the reserve. Absent / non-numeric
+// COLUMNS → undefined, so allocateNameCaps falls back to the fixed caps (zero regression).
+export function usableColumns(env = {}) {
+  const raw = positiveOr(env.COLUMNS, undefined);
+  if (raw === undefined) return undefined;
+  return Math.max(raw - resolveWidthReserve(env), 1);
+}
+
 // Allocate the folder/branch display caps from the terminal width (COLUMNS) — the responsive core.
 // Rather than pick from static bands, it spends the *actually available* columns:
 //   budget = columns − overhead   (overhead = displayWidth of everything else up to the token gauge)
@@ -289,7 +312,7 @@ export function resolveFolderMax(env = {}) {
 // very wide terminal); under pressure the branch is protected and the folder yields first, each with
 // a comfort floor so neither vanishes. An explicit CLEPSYDRE_*_MAX (Infinity = opt-out, or a number)
 // still wins and simply consumes its share of the budget. Unknown width → today's fixed caps.
-const NAME_FLOOR = 8; // keep each name at least this wide under pressure, when the budget allows
+const NAME_FLOOR = 5; // keep each name at least this wide under pressure — never vanish to an empty 📁 …
 export function allocateNameCaps({ columns, overhead, folderLen, branchLen, folderMax = null, branchMax = null }) {
   const hasBranch = branchLen > 0;
   const folderFixed = hasBranch ? FOLDER_MAX_WITH_BRANCH : FOLDER_MAX_WITHOUT_BRANCH;
@@ -317,12 +340,26 @@ export function allocateNameCaps({ columns, overhead, folderLen, branchLen, fold
     // Both auto: if they fit, show both in full; else protect the branch, folder yields first.
     if (folderLen + branchLen <= avail) return { folderCap: folderLen, branchCap: branchLen };
     const branchCap = Math.min(branchLen, Math.max(avail - NAME_FLOOR, NAME_FLOOR));
-    return { folderCap: Math.max(avail - branchCap, 0), branchCap };
+    // Floor the folder too: under extreme pressure both names sit at NAME_FLOOR (total may exceed
+    // the budget — the terminal then clips the rate window, not the gauge/memory). Never 0.
+    return { folderCap: Math.max(avail - branchCap, NAME_FLOOR), branchCap };
   }
-  // At most one auto segment: it takes what's left, the other renders at its explicit cap.
-  const folderCap = folderAuto ? Math.max(Math.min(folderLen, avail), 0) : explicit(folderLen, folderMax);
-  const branchCap = !hasBranch ? 0 : branchAuto ? Math.max(Math.min(branchLen, avail), 0) : explicit(branchLen, branchMax);
+  // At most one auto segment: it takes what's left (floored so it never vanishes), the other
+  // renders at its explicit cap.
+  const folderCap = folderAuto ? Math.max(Math.min(folderLen, avail), NAME_FLOOR) : explicit(folderLen, folderMax);
+  const branchCap = !hasBranch ? 0 : branchAuto ? Math.max(Math.min(branchLen, avail), NAME_FLOOR) : explicit(branchLen, branchMax);
   return { folderCap, branchCap };
+}
+
+// Under an extreme-narrow terminal even the floored names (NAME_FLOOR each) can't keep the whole
+// line visible — rendering them as "se…or" stubs is ugly AND still overflows. In that case we
+// collapse the names to their icons instead (📁 ⎇ ±N), freeing their whole width so gauge + memory
+// + rate stay visible far lower (see ADR 0006, step-8 degradation ladder). Pure decision helper.
+export function shouldCollapseNames({ columns, overhead, folderLen, branchLen }) {
+  if (!Number.isFinite(columns)) return false;
+  const minFolder = Math.min(folderLen, NAME_FLOOR);
+  const minBranch = branchLen > 0 ? Math.min(branchLen, NAME_FLOOR) : 0;
+  return overhead + minFolder + minBranch > columns;
 }
 
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
@@ -347,13 +384,38 @@ export function buildStatusLine({ model, modelMax, basename, git, used, max, mem
   const counts = hasBranch ? gitCounts(git.ahead, git.behind, git.dirty) : '';
   const countsPart = counts ? ` ${ORANGE}${counts}${RESET}` : '';
 
-  // Responsive caps: overhead = the display width of the gauge-protected prefix *minus* the folder
-  // and branch names, so allocateNameCaps knows how many columns are left for those two variable
-  // segments and can protect the token gauge for ANY name length (see ADR 0006).
+  // The tail segments (memory, rate) are fixed-length and always shown IN FULL — they are not a
+  // flex variable. Build them up front so their width counts into the overhead, then append them
+  // unchanged after the names. This is the crux of the "everything always visible" contract: the
+  // names are the SOLE variable that yields (see ADR 0006).
+  let memPart = '';
+  if (mem) {
+    const m = memTier(mem.mdBytes, t.mem);
+    memPart = ` · ${m.color}${m.icon} MEMORY.md ${fmtBytes(mem.mdBytes)}` +
+      ` · mem ${fmtBytes(mem.dirBytes)}/${mem.fileCount}f${RESET}`;
+  }
+  // The 5h rate window is pinned to the far right (ADR 0002). A null pct means the window rolled
+  // over but no fresh numbers arrived yet (idle session): render the calm low tier with a plain
+  // "reset" marker, never the stale — possibly scary-red — percentage.
+  let ratePart = '';
+  if (rate) {
+    const r = rateTier(rate.pct ?? 0, t.rate);
+    ratePart = ` · ${r.color}${r.icon} ${rate.pct === null ? 'reset' : `${rate.pct}%`}`;
+    if (rate.resetIn !== null) ratePart += ` ↻ ${fmtCountdown(rate.resetIn)}`;
+    ratePart += RESET;
+  }
+
+  // Responsive caps: overhead = the display width of EVERYTHING except the folder/branch name
+  // characters — the model badge, the git glue, the token gauge AND the memory + rate tail. So the
+  // names fit *around* the whole line and every other segment stays fully visible for any name
+  // length; if even the floored names can't fit, only the rate window (rightmost) is clipped by the
+  // terminal — never the gauge or memory (see ADR 0006).
   const overhead =
     displayWidth(`${bracket} 📁 `) +
     (hasBranch ? displayWidth(' ⎇ ') + displayWidth(countsPart) : 0) +
-    displayWidth(` · ${tok}`);
+    displayWidth(` · ${tok}`) +
+    displayWidth(memPart) +
+    displayWidth(ratePart);
   const { folderCap, branchCap } = allocateNameCaps({
     columns,
     overhead,
@@ -363,28 +425,26 @@ export function buildStatusLine({ model, modelMax, basename, git, used, max, mem
     branchMax,
   });
 
-  let out = `${bracket} 📁 ${truncateMiddle(basename, folderCap)}`;
-  if (hasBranch) {
-    out += ` ⎇ ${truncateBranch(git.branch, branchCap)}${countsPart}`;
+  // Extreme narrow: even the floored stubs (se…or) would overflow, so collapse the names to their
+  // icons — 📁 (and ⎇ + git status when in a repo) — freeing their whole width so the gauge, memory
+  // and rate stay visible far lower down (ADR 0006 degradation ladder). Above the threshold the
+  // names shrink normally (readable), below it they vanish to icons rather than to ugly stubs.
+  const collapse = shouldCollapseNames({
+    columns, overhead, folderLen: basename.length, branchLen: hasBranch ? git.branch.length : 0,
+  });
+
+  let out;
+  if (collapse) {
+    out = hasBranch ? `${bracket} 📁 ⎇${countsPart}` : `${bracket} 📁`;
+  } else {
+    out = `${bracket} 📁 ${truncateMiddle(basename, folderCap)}`;
+    if (hasBranch) {
+      out += ` ⎇ ${truncateBranch(git.branch, branchCap)}${countsPart}`;
+    }
   }
   out += ` · ${tok}`;
-  if (mem) {
-    const m = memTier(mem.mdBytes, t.mem);
-    out += ` · ${m.color}${m.icon} MEMORY.md ${fmtBytes(mem.mdBytes)}` +
-      ` · mem ${fmtBytes(mem.dirBytes)}/${mem.fileCount}f${RESET}`;
-  }
-  // The 5h rate window is pinned to the far right (ADR 0002): it's the most sacrificable
-  // segment (plan-specific, furthest from the context-window mission), so it's the first
-  // thing the terminal clips on a narrow window — never at the token gauge's expense.
-  if (rate) {
-    // A null pct means the window rolled over but no fresh numbers arrived yet (idle
-    // session): render the calm low tier with a plain "reset" marker, never the stale
-    // — possibly scary-red — percentage.
-    const r = rateTier(rate.pct ?? 0, t.rate);
-    out += ` · ${r.color}${r.icon} ${rate.pct === null ? 'reset' : `${rate.pct}%`}`;
-    if (rate.resetIn !== null) out += ` ↻ ${fmtCountdown(rate.resetIn)}`;
-    out += RESET;
-  }
+  out += memPart;
+  out += ratePart;
   return out;
 }
 
@@ -533,8 +593,10 @@ export function main() {
     rate,
     thresholds: resolveThresholds(process.env),
     // Terminal width Claude Code sets for the status-line process (ADR 0006); undefined when absent
-    // or non-numeric → allocateNameCaps falls back to the fixed caps. Drives the responsive sizing.
-    columns: positiveOr(process.env.COLUMNS, undefined),
+    // or non-numeric → allocateNameCaps falls back to the fixed caps. We hold back a small reserve
+    // (statusLine padding + Claude Code's own ellipsis) so the WHOLE line fits for real. Drives the
+    // responsive sizing.
+    columns: usableColumns(process.env),
     branchMax: resolveBranchMax(process.env),
     folderMax: resolveFolderMax(process.env),
   });
