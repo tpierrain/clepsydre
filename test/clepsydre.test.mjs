@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   fmtTokens, fmtBytes, tokenTier, memTier, resolveMax, pct, buildStatusLine,
   computeMemDir, readMemory, resolveThresholds, gitCounts, parseGitStatus,
-  resolveGitCounts, gitInfo,
+  resolveGitCounts, gitInfo, resolveEffort, effortInfo, effortGlyph,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -158,6 +158,48 @@ test('resolveGitCounts: explicit opt-out (0/false/no/off, any case) → disabled
   }
 });
 
+test('resolveEffort: absent flag → enabled (on by default)', () => {
+  assert.equal(resolveEffort({}), true);
+});
+
+test('resolveEffort: other truthy spellings (1/true/yes/on, any case) → enabled', () => {
+  for (const v of ['1', 'true', 'TRUE', 'yes', 'on', ' On ']) {
+    assert.equal(resolveEffort({ CLEPSYDRE_EFFORT: v }), true, v);
+  }
+});
+
+test('resolveEffort: explicit opt-out (0/false/no/off, any case) → disabled', () => {
+  for (const v of ['0', 'false', 'FALSE', 'no', 'off', ' Off ']) {
+    assert.equal(resolveEffort({ CLEPSYDRE_EFFORT: v }), false, v);
+  }
+});
+
+test('effortInfo: a present level is returned verbatim', () => {
+  for (const level of ['low', 'medium', 'high', 'xhigh', 'max']) {
+    assert.equal(effortInfo({ level }), level);
+  }
+});
+
+test('effortInfo: surrounding whitespace is trimmed', () => {
+  assert.equal(effortInfo({ level: '  high  ' }), 'high');
+});
+
+test('effortInfo: absent field / empty / non-string → null (segment omitted, never fabricated)', () => {
+  assert.equal(effortInfo(undefined), null);
+  assert.equal(effortInfo({}), null);
+  assert.equal(effortInfo({ level: '' }), null);
+  assert.equal(effortInfo({ level: '   ' }), null);
+  assert.equal(effortInfo({ level: 3 }), null);
+});
+
+test('effortGlyph: each level compacts to its single-glyph form (ADR 0002 table)', () => {
+  assert.equal(effortGlyph('low'), 'L');
+  assert.equal(effortGlyph('medium'), 'M');
+  assert.equal(effortGlyph('high'), 'H');
+  assert.equal(effortGlyph('xhigh'), 'xH');
+  assert.equal(effortGlyph('max'), 'MAX');
+});
+
 test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only, never lose the branch', () => {
   const run = (dir, args) => {
     if (args[0] === 'status') throw new Error('porcelain unsupported / git hiccup');
@@ -274,6 +316,31 @@ test('buildStatusLine: no branch means the git-counts suffix is never shown', ()
     model: 'Opus 4.8', basename: 'p',
     git: { branch: '', ahead: 5, behind: 5, dirty: 5 },
     used: 1000, max: 230000, mem: null,
+  });
+  assert.equal(line, `[Opus 4.8] 📁 p · ${GREEN}🧠 1.0k/230.0k (0%)${RESET}`);
+});
+
+test('buildStatusLine: an effort level is compacted to a glyph glued to the [model] bracket', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'my-project', git: { branch: 'main' },
+    used: 65300, max: 230000, mem: null, effort: 'high',
+  });
+  assert.equal(
+    line,
+    `[Opus 4.8·H] 📁 my-project ⎇ main · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`,
+  );
+});
+
+test('buildStatusLine: xhigh/max compact to their multi-char glyphs inside the bracket', () => {
+  const at = (effort) =>
+    buildStatusLine({ model: 'Opus 4.8', basename: 'p', used: 1000, max: 230000, mem: null, effort });
+  assert.match(at('xhigh'), /^\[Opus 4\.8·xH\] /);
+  assert.match(at('max'), /^\[Opus 4\.8·MAX\] /);
+});
+
+test('buildStatusLine: a null effort leaves the [model] bracket bare (segment omitted)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'p', used: 1000, max: 230000, mem: null, effort: null,
   });
   assert.equal(line, `[Opus 4.8] 📁 p · ${GREEN}🧠 1.0k/230.0k (0%)${RESET}`);
 });
@@ -473,4 +540,40 @@ test('end-to-end: piping Claude Code JSON prints the composed status line', () =
     `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 65.3k/1.0M (6%)${RESET}` +
       ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}\n`,
   );
+});
+
+test('end-to-end: effort in the payload → the glyph is glued inside the [model] bracket', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+    effort: { level: 'high' },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
+  });
+  assert.match(out, /^\[TestModel·H\] /); // effort compacted to a glyph, anchored to the model
+});
+
+test('end-to-end: effort opted OUT (=0) → the [model] bracket stays bare even with effort present', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+    effort: { level: 'max' },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_EFFORT: '0' },
+  });
+  assert.match(out, /^\[TestModel\] /); // bare bracket — no ·MAX
 });
