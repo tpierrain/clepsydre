@@ -7,9 +7,10 @@
 > bridge can only be stale/misleading, see
 > [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md); **step 13** shortened
 > the line (model label compacted, git branch bounded-by-default at 30, opt-out via
-> `CLEPSYDRE_BRANCH_MAX=0`). **Next:** cut a release crediting @anaelChardan & @guillaumejay, then the
-> remaining **human-only** field checks (steps 5–6). Start at the first unchecked `- [ ]`; tick boxes
-> and note _(date · commit)_ as you go.
+> `CLEPSYDRE_BRANCH_MAX=0`). **Shipped as v1.4.0** — "The One That Trims the Long Names", crediting
+> @anaelChardan & @guillaumejay. **Only the human-only field checks (steps 5–6) remain** — they need
+> the other machines, not this dev Mac. Start at the first unchecked `- [ ]`; tick boxes and note
+> _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
 ## Shipped (git-counts feature — done)
@@ -126,6 +127,10 @@ placement/rendering only — driven by the documented rule, not taste.
   - [x] **Re-measure** the rendered width on an 80-column terminal after each change; note the win.
         _(2026-07-11 · field example `inqom-brain`: 117 → 104 code points, **−13 cols** from the model
         label alone; branch cap is defensive/opt-in so it doesn't shrink the `main` example)_
+
+- [x] **14. Release steps 12–13 together** — MINOR bump, *Friends*-style title, crediting
+      **@anaelChardan** and **@guillaumejay** in the notes.
+      _(2026-07-11 · **v1.4.0 — "The One That Trims the Long Names"**, tag on `d7d4f47`)_
 
 ## Remaining — human-only field checks (no code)
 
