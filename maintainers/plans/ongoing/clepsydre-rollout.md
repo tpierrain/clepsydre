@@ -49,18 +49,20 @@ placement/rendering only — driven by the documented rule, not taste.
   - [x] **Highlight the contributors** (Thomas' explicit ask): README **Acknowledgements** section,
         a `Feature origin: @anaelChardan` note in the code, and credit in the merge-commit body.
 
-- [ ] **9. #4 — 5h rate-limit window (@guillaumejay): pinned far right.**
-  - [ ] Ensure the `⏳ % ↻ reset` segment renders **last (far right)**, first to be clipped, per
+- [x] **9. #4 — 5h rate-limit window (@guillaumejay): pinned far right.**
+      _(2026-07-11 · merge `ad1c764` — commits `64e7f75`+`85dec31`+`81033b3` @guillaumejay + maintainer `6e10481`, **not squashed**)_
+  - [x] Ensure the `⏳ % ↻ reset` segment renders **last (far right)**, first to be clipped, per
         ADR 0002; **keep intact** the stale-past-reset `⏳ reset` marker, the `CLEPSYDRE_RATE_WINDOW`
-        opt-out and the `…_WARN` / `…_HIGH` thresholds.
-  - [ ] Resolve the `buildStatusLine` + README collisions between the two PRs (whichever lands
-        second rebases onto the first). Strict TDD; suite green.
-  - [ ] Update the README legend/order to the canonical ADR-0002 order.
-  - [ ] Append the **5-hour rate-limit window** to @guillaumejay's line in the README
-        **Acknowledgements** (added in step 8; left out until #4 actually lands to avoid documenting
-        an unshipped feature).
-  - [ ] Post a PR comment: thank, explain the far-right placement with a link to ADR 0002, keep
+        opt-out and the `…_WARN` / `…_HIGH` thresholds. _(TDD: placement test flipped red→green)_
+  - [x] Resolve the `buildStatusLine` + README collisions between the two PRs (#4 landed second →
+        merged `main` in, faithful merge commit `2b86f3c`, then maintainer follow-up). Suite green (91).
+  - [x] Update the README legend/order to the canonical ADR-0002 order.
+  - [x] Append the **5-hour rate-limit window** to @guillaumejay's line in the README
+        **Acknowledgements**.
+  - [x] Post a PR comment: thank, explain the far-right placement with a link to ADR 0002, keep
         credit; merge preserving authorship (merge commit, **not** squashed).
+  - [x] Bonus refactor under green: routed `resolveEffort` through the shared
+        `enabledUnlessOptedOut` helper #4 introduced (dropped the duplicate `EFFORT_OFF` set).
 
 - [ ] **10. Release both segments together** — MINOR bump, *Friends*-style title ("The One
       That…"), crediting **@anaelChardan** and **@guillaumejay** in the notes.
