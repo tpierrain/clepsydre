@@ -8,11 +8,11 @@
 > [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md); **step 13** shortened
 > the line (model label compacted, git branch bounded-by-default at 30, opt-out via
 > `CLEPSYDRE_BRANCH_MAX=0`). **Shipped as v1.4.0** — "The One That Trims the Long Names", crediting
-> @anaelChardan & @guillaumejay. **Step 19 done** (2026-07-11 · `dd11d63`) — git/folder caps tightened
-> (branch 18, folder 18-with-branch / 30-without), folded into v1.4.0 (tag moved, notes fixed); this
-> also subsumed step 16. **Only the human-only field checks (steps 5–6) remain** — they need the other
-> machines (Mac + Windows), not this dev Mac. Start at the first unchecked `- [ ]`; tick boxes and note
-> _(date · commit)_ as you go.
+> @anaelChardan & @guillaumejay. **Step 19 done** (2026-07-11 · `dd11d63`, retightened `d9aebe2`) —
+> git/folder caps bounded, then tightened over two field rounds to **branch 12, folder 12-with-branch /
+> 25-without**, folded into v1.4.0 (tag moved, notes fixed); this also subsumed step 16. **Only the
+> human-only field checks (steps 5–6) remain** — they need the other machines (Mac + Windows), not this
+> dev Mac. Start at the first unchecked `- [ ]`; tick boxes and note _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
 ## Shipped (git-counts feature — done)
@@ -197,8 +197,9 @@ placement/rendering only — driven by the documented rule, not taste.
 > `CLEPSYDRE_BRANCH_MAX` / `CLEPSYDRE_FOLDER_MAX` still override; `0`/`off` still opts out. Strict TDD,
 > suite green before each commit. Full detail: `~/.claude/plans/jaunty-launching-seal.md`.
 
-- [ ] **19. Branch cap 18; folder cap 18-with-branch / 30-without.**
-      _(code + tests + docs done 2026-07-11 · `dd11d63`, strict TDD, suite green at 120; release fold pending Thomas)_
+- [x] **19. Branch cap 12; folder cap 12-with-branch / 25-without.**
+      _(done 2026-07-11 · `dd11d63` then retightened `d9aebe2` — two field rounds: 30→18→12 branch,
+      20/30→18/30→12/25 folder; strict TDD, suite green at 120; folded into v1.4.0)_
   - [x] `clepsydre.mjs`: `DEFAULT_BRANCH_MAX` 30 → **18**; replaced `DEFAULT_FOLDER_MAX = 20` with
         `FOLDER_MAX_WITH_BRANCH = 18` + `FOLDER_MAX_WITHOUT_BRANCH = 30`; made
         `resolveFolderMax(env = {}, hasBranch = false)` pick the conditional default (explicit env still
