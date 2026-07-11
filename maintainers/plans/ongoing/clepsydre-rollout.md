@@ -1,10 +1,11 @@
 # 🏺 Clepsydre — rollout, git-counts & external-segment PRs (ongoing)
 
-> **The single active plan.** The git-counts feature is shipped; two threads remain:
-> **integrating two external-contributor PRs** (#4 rate-window, #5 effort) under
-> [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md), and **manual field
-> validation** on real Mac/Windows machines. Start at the first unchecked `- [ ]`; tick boxes and
-> note _(date · commit)_ as you go.
+> **The single active plan.** The git-counts feature **and** both external-contributor PRs
+> (#5 effort, #4 rate-window) are shipped and released in **v1.3.0** under
+> [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md). Only two things remain, both
+> outside code: **manual field validation** on real Mac/Windows machines (step 5–6, human-only), and
+> an **optional** git-branch width cap (step 11, deferred). Start at the first unchecked `- [ ]`;
+> tick boxes and note _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
 ## Shipped (git-counts feature — done)
@@ -64,8 +65,9 @@ placement/rendering only — driven by the documented rule, not taste.
   - [x] Bonus refactor under green: routed `resolveEffort` through the shared
         `enabledUnlessOptedOut` helper #4 introduced (dropped the duplicate `EFFORT_OFF` set).
 
-- [ ] **10. Release both segments together** — MINOR bump, *Friends*-style title ("The One
+- [x] **10. Release both segments together** — MINOR bump, *Friends*-style title ("The One
       That…"), crediting **@anaelChardan** and **@guillaumejay** in the notes.
+      _(2026-07-11 · **v1.3.0 — "The One That Shows Your Effort (and Your Limits)"**, tag on `55f0cb2`)_
 
 - [ ] **11. (Optional) Bound the git branch width** — so a long branch name can't evict tier-1 on
       narrow terminals (ADR 0002 "Consequences"); TDD. Defer unless it bites in the field.
