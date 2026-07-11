@@ -1,8 +1,10 @@
-# 🏺 Clepsydre — rollout & git-counts (ongoing)
+# 🏺 Clepsydre — rollout, git-counts & external-segment PRs (ongoing)
 
-> **The single active plan.** All the *development* is shipped; what's left is **manual
-> field validation only — checks a human runs on a real Mac/Windows machine, no code work.**
-> Start at the first unchecked `- [ ]`; tick boxes and note _(date · commit)_ as you go.
+> **The single active plan.** The git-counts feature is shipped; two threads remain:
+> **integrating two external-contributor PRs** (#4 rate-window, #5 effort) under
+> [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md), and **manual field
+> validation** on real Mac/Windows machines. Start at the first unchecked `- [ ]`; tick boxes and
+> note _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
 ## Shipped (git-counts feature — done)
@@ -20,6 +22,45 @@ lives in git, the ADR and the release — not duplicated here:
       @guillaumejay. _(2026-07-04 · PR #3 `9c7cce7` · release v1.2.0)_
 - [x] **Split `CLAUDE.md`** into a public root + `maintainers/CLAUDE.md`, so installs don't leak
       maintainer prompts to end users. _(2026-07-04)_
+
+## External-segment PRs (#4 rate-window, #5 effort) — integrate under ADR 0002
+
+Two external PRs add new status-line segments. They are **merged with modifications by the
+maintainer** (contributor unavailable to iterate before a break), **preserving each contributor's
+logic and crediting them as feature origin**, per
+[ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md). Every modification is
+placement/rendering only — driven by the documented rule, not taste.
+
+- [x] **7. Design rule recorded** — ADR 0002 (segment ordering encodes priority) + a thin pointer
+      in `maintainers/CLAUDE.md`. _(2026-07-11 · `0e150a4`)_
+
+- [ ] **8. #5 — reasoning effort (@anaelChardan): compacted & anchored to the model.**
+  - [ ] Change the render from `💪 <word>` to a **single glyph glued to the `[model]` bracket** —
+        `[Opus 4.8·H]` — mapping `L`/`M`/`H`/`xH`/`MAX` (ADR 0002 table); bracket stays bare when
+        the model has no effort field.
+  - [ ] Move it out of the `· … ·` chain into the bracket in `buildStatusLine`; **keep intact** the
+        `CLEPSYDRE_EFFORT` opt-out and the null-omit behaviour. Strict TDD.
+  - [ ] Update the tests to the new rendering (bracket glyph, `xH`/`MAX`, omit-on-null); suite
+        green (`node --test`).
+  - [ ] Update the README (What you see / How to read it / effort section) to the glyph form.
+  - [ ] Post a PR comment: thank, explain the change with a link to ADR 0002, keep credit; merge
+        preserving authorship (push over their commits / follow-up commit).
+
+- [ ] **9. #4 — 5h rate-limit window (@guillaumejay): pinned far right.**
+  - [ ] Ensure the `⏳ % ↻ reset` segment renders **last (far right)**, first to be clipped, per
+        ADR 0002; **keep intact** the stale-past-reset `⏳ reset` marker, the `CLEPSYDRE_RATE_WINDOW`
+        opt-out and the `…_WARN` / `…_HIGH` thresholds.
+  - [ ] Resolve the `buildStatusLine` + README collisions between the two PRs (whichever lands
+        second rebases onto the first). Strict TDD; suite green.
+  - [ ] Update the README legend/order to the canonical ADR-0002 order.
+  - [ ] Post a PR comment: thank, explain the far-right placement with a link to ADR 0002, keep
+        credit; merge preserving authorship.
+
+- [ ] **10. Release both segments together** — MINOR bump, *Friends*-style title ("The One
+      That…"), crediting **@anaelChardan** and **@guillaumejay** in the notes.
+
+- [ ] **11. (Optional) Bound the git branch width** — so a long branch name can't evict tier-1 on
+      narrow terminals (ADR 0002 "Consequences"); TDD. Defer unless it bites in the field.
 
 ## Remaining — human-only field checks (no code)
 
