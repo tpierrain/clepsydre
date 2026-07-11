@@ -42,6 +42,10 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 [Opus 4.8·H] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f · ⏳ 23% ↻ 2h13
 ```
 
+Here it is live, with every segment on screen:
+
+![Clepsydre status line, all segments: [Opus 4.8·H] folder clepsydre, branch main, 40.6k/300.0k (13%) green, MEMORY.md 0B, mem 0B/0f, rate window 8% resets in 4h05](assets/statusline-overview.png)
+
 - **Model · reasoning effort · folder · git branch** — the effort level rides *inside* the model
   bracket as a single glyph (`·L`/`·M`/`·H`/`·xH`/`·MAX`), so `[Opus 4.8·H]` = Opus 4.8 thinking at
   **high**. It tracks live `/effort` changes, and the bracket stays bare when the model has no
