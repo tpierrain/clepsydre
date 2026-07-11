@@ -5,6 +5,15 @@
 > request — never proactively). If the user only *uses* Clepsydre, none of this applies: go
 > back and just help with what they asked.
 
+## Design principles
+
+- **Segment ordering encodes priority — the token gauge and memory are never evicted by new
+  segments.** The line is one string clipped at the right edge by the terminal, so left-to-right
+  position *is* the degradation order. New/secondary segments append to the right (rate-window
+  last), variable-length ones (git branch) must be bounded; reasoning effort is the sole
+  left-anchored exception (glued to `[model]`, single glyph). Apply it when reviewing any PR that
+  adds a segment. See [ADR 0002](docs/adr/0002-segment-ordering-encodes-priority.md).
+
 ## Plans & resuming work
 
 Plans live under **`maintainers/plans/`**, split three ways:

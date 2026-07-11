@@ -125,6 +125,19 @@ export function fmtCountdown(seconds) {
   return `${h}h${String(m).padStart(2, '0')}`;
 }
 
+// Reasoning-effort segment — feature origin: @anaelChardan (PR #5). The contributor's opt-out
+// flag and null-omit logic are preserved verbatim; the maintainer only re-anchored the rendering
+// into the [model] bracket per ADR 0002.
+//
+// Resolve the reasoning-effort flag from the environment. ON by default: the effort
+// segment shows unless explicitly opted OUT with a falsy value (0/false/no/off, any case),
+// mirroring resolveGitCounts. Read from process.env so it can be turned off globally
+// (~/.claude/settings.json) or per-project (<project>/.claude/settings.json).
+const EFFORT_OFF = new Set(['0', 'false', 'no', 'off']);
+export function resolveEffort(env = {}) {
+  return !EFFORT_OFF.has(String(env.CLEPSYDRE_EFFORT ?? '').trim().toLowerCase());
+}
+
 // Integer percentage of the working window used, truncated (bash `USED*100/MAX`).
 export function pct(used, max) {
   return max > 0 ? Math.trunc((used * 100) / max) : 0;
@@ -142,6 +155,23 @@ export function gitCounts(ahead = 0, behind = 0, dirty = 0) {
   if (behind > 0) parts.push(`↓${behind}`);
   if (dirty > 0) parts.push(`±${dirty}`);
   return parts.join(' ');
+}
+
+// Pure extraction of the reasoning-effort level from Claude Code's `effort` input:
+// the level string (low|medium|high|xhigh|max) or null when unavailable — the field
+// only exists when the current model supports the effort parameter, so null means
+// "omit the segment", never a fabricated default.
+export function effortInfo(effort) {
+  const level = effort?.level;
+  return typeof level === 'string' && level.trim() !== '' ? level.trim() : null;
+}
+
+// Compact a verbatim effort level to its single-glyph form, per the ADR 0002 table, so it
+// can sit glued to the [model] bracket and never grow the line. An unknown level falls
+// through to its own upper-cased form (forward-compatible: a future level still renders).
+const EFFORT_GLYPHS = { low: 'L', medium: 'M', high: 'H', xhigh: 'xH', max: 'MAX' };
+export function effortGlyph(level) {
+  return EFFORT_GLYPHS[level] ?? String(level).toUpperCase();
 }
 
 // Pure extraction of the 5h rate-window state from Claude Code's `rate_limits` input:
@@ -168,11 +198,15 @@ export function rateInfo(rateLimits, now) {
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, basename, git, used, max, mem, rate, thresholds }) {
+export function buildStatusLine({ model, basename, git, used, max, mem, effort, rate, thresholds }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
-  let out = `[${model}] 📁 ${basename}`;
+  // Reasoning effort is anchored to the model label (ADR 0002): compacted to a single glyph
+  // and glued inside the [model] bracket with a middot — so it stays left-most and can never
+  // grow the line or evict the token gauge. A null effort leaves the bracket bare.
+  const effortTag = effort ? `·${effortGlyph(effort)}` : '';
+  let out = `[${model}${effortTag}] 📁 ${basename}`;
   if (git?.branch) {
     out += ` ⎇ ${git.branch}`;
     const counts = gitCounts(git.ahead, git.behind, git.dirty);
@@ -323,6 +357,7 @@ export function main() {
   const mem = readMemory(computeMemDir(transcript, dir, os.homedir()));
 
   const git = gitInfo(dir, resolveGitCounts(process.env));
+  const effort = resolveEffort(process.env) ? effortInfo(input.effort) : null;
   const rate = resolveRateWindow(process.env)
     ? rateInfo(input.rate_limits, Math.floor(Date.now() / 1000))
     : null;
@@ -333,6 +368,7 @@ export function main() {
     used,
     max,
     mem,
+    effort,
     rate,
     thresholds: resolveThresholds(process.env),
   });
