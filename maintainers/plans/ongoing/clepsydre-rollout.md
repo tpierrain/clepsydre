@@ -34,17 +34,20 @@ placement/rendering only — driven by the documented rule, not taste.
 - [x] **7. Design rule recorded** — ADR 0002 (segment ordering encodes priority) + a thin pointer
       in `maintainers/CLAUDE.md`. _(2026-07-11 · `0e150a4`)_
 
-- [ ] **8. #5 — reasoning effort (@anaelChardan): compacted & anchored to the model.**
-  - [ ] Change the render from `💪 <word>` to a **single glyph glued to the `[model]` bracket** —
+- [x] **8. #5 — reasoning effort (@anaelChardan): compacted & anchored to the model.**
+      _(2026-07-11 · merge `384f549` — commits `537046a` @anaelChardan + `fddacce` maintainer, **not squashed**)_
+  - [x] Change the render from `💪 <word>` to a **single glyph glued to the `[model]` bracket** —
         `[Opus 4.8·H]` — mapping `L`/`M`/`H`/`xH`/`MAX` (ADR 0002 table); bracket stays bare when
-        the model has no effort field.
-  - [ ] Move it out of the `· … ·` chain into the bracket in `buildStatusLine`; **keep intact** the
+        the model has no effort field. _(new pure helper `effortGlyph`)_
+  - [x] Move it out of the `· … ·` chain into the bracket in `buildStatusLine`; **keep intact** the
         `CLEPSYDRE_EFFORT` opt-out and the null-omit behaviour. Strict TDD.
-  - [ ] Update the tests to the new rendering (bracket glyph, `xH`/`MAX`, omit-on-null); suite
-        green (`node --test`).
-  - [ ] Update the README (What you see / How to read it / effort section) to the glyph form.
-  - [ ] Post a PR comment: thank, explain the change with a link to ADR 0002, keep credit; merge
+  - [x] Update the tests to the new rendering (bracket glyph, `xH`/`MAX`, omit-on-null); suite
+        green (71, `node --test`).
+  - [x] Update the README (What you see / How to read it / effort section) to the glyph form.
+  - [x] Post a PR comment: thank, explain the change with a link to ADR 0002, keep credit; merge
         preserving authorship (push over their commits / follow-up commit).
+  - [x] **Highlight the contributors** (Thomas' explicit ask): README **Acknowledgements** section,
+        a `Feature origin: @anaelChardan` note in the code, and credit in the merge-commit body.
 
 - [ ] **9. #4 — 5h rate-limit window (@guillaumejay): pinned far right.**
   - [ ] Ensure the `⏳ % ↻ reset` segment renders **last (far right)**, first to be clipped, per
@@ -53,8 +56,11 @@ placement/rendering only — driven by the documented rule, not taste.
   - [ ] Resolve the `buildStatusLine` + README collisions between the two PRs (whichever lands
         second rebases onto the first). Strict TDD; suite green.
   - [ ] Update the README legend/order to the canonical ADR-0002 order.
+  - [ ] Append the **5-hour rate-limit window** to @guillaumejay's line in the README
+        **Acknowledgements** (added in step 8; left out until #4 actually lands to avoid documenting
+        an unshipped feature).
   - [ ] Post a PR comment: thank, explain the far-right placement with a link to ADR 0002, keep
-        credit; merge preserving authorship.
+        credit; merge preserving authorship (merge commit, **not** squashed).
 
 - [ ] **10. Release both segments together** — MINOR bump, *Friends*-style title ("The One
       That…"), crediting **@anaelChardan** and **@guillaumejay** in the notes.
