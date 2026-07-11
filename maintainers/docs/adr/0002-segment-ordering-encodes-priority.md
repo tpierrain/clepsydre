@@ -75,16 +75,16 @@ Adopt an **ordering invariant: a segment's left-to-right position encodes its pr
   `⏳ reset` marker and @anaelChardan's null-omit behaviour both stay. Credit both as feature
   origins here and in the release notes (as ADR 0001 credited @guillaumejay).
 - **The git branch is width-capped** so an unbounded branch name can't evict tier-1 on narrow
-  terminals. _Implemented (2026-07-11):_ bounded **by default at 18 chars** with a **middle**
+  terminals. _Implemented (2026-07-11):_ bounded **by default at 12 chars** with a **middle**
   ellipsis (keeps the distinctive head `feature/…` and tail `…-name`, unlike a tail-only cut);
   tunable via `CLEPSYDRE_BRANCH_MAX`, and `0`/`off` opts out to a full branch (fine on a wide
   screen, where nothing is evicted anyway). Default-bounded keeps this invariant true out of the box.
-  _(Tightened 30 → 18 after field feedback: a 27-char branch under the old cap still crowded the
-  gauge + memory.)_
+  _(Tightened over two rounds of field feedback: 30 → 18 → 12 — even 18 let branch + folder together
+  clip the memory segment.)_
 - **The folder name is width-capped too** — same reasoning as the branch. _Implemented
-  (2026-07-11):_ bounded **by default** with a **conditional** figure — **18 chars when a branch is
+  (2026-07-11):_ bounded **by default** with a **conditional** figure — **12 chars when a branch is
   also shown** (the two variable-length segments then share the space left of tier-1, so each stays
-  tight), **30 without** (a non-git working dir — the folder owns that space alone, so it can
+  tight), **25 without** (a non-git working dir — the folder owns that space alone, so it can
   breathe; it's also the more redundant of the two, so it absorbs the looser figure). Same **middle**
   ellipsis, sharing the `truncateMiddle` helper; tunable via `CLEPSYDRE_FOLDER_MAX` (an explicit
   value wins over the conditional default), `0`/`off` opts out to the full name. Closes the last

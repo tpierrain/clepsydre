@@ -78,8 +78,8 @@ Reading the example line above from left to right:
 | Piece | Means |
 | --- | --- |
 | `[Opus 4.8 1M·H]` | The **model** currently answering you. `1M` is the **context window it exposes** (`1M`, `200k`, …) — the real size Claude Code reports for the model, compacted to a short badge; *on by default, opt-out* via `CLEPSYDRE_MODEL_MAX` (see [model window size](#model-window-size-on-by-default-opt-out)). Never guessed, never a hardcoded table. `·H` is the **reasoning effort** compacted to a single glyph after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)); tracks live `/effort` changes. The bracket drops whatever doesn't apply (`[Opus 4.8]` when there's neither). |
-| `📁 my-project` | The **folder** (project) you're working in. Capped at 18 chars by default (30 with no git branch) (middle ellipsis); tune or disable with `CLEPSYDRE_FOLDER_MAX` (see [bounding a long folder name](#bounding-a-long-folder-name-on-by-default)). |
-| `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Capped at 18 chars by default (middle ellipsis); tune or disable with `CLEPSYDRE_BRANCH_MAX` (see [bounding a long branch name](#bounding-a-long-branch-name-on-by-default)). Outside a repo, this whole part just disappears. |
+| `📁 my-project` | The **folder** (project) you're working in. Capped at 12 chars by default (25 with no git branch) (middle ellipsis); tune or disable with `CLEPSYDRE_FOLDER_MAX` (see [bounding a long folder name](#bounding-a-long-folder-name-on-by-default)). |
+| `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Capped at 12 chars by default (middle ellipsis); tune or disable with `CLEPSYDRE_BRANCH_MAX` (see [bounding a long branch name](#bounding-a-long-branch-name-on-by-default)). Outside a repo, this whole part just disappears. |
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
@@ -278,12 +278,12 @@ the line falls back to the plain branch and the rest of the status line is never
 
 A long branch name sits *left* of the token gauge, so on a narrow terminal it would push the
 gauge — Clepsydre's crown jewel — rightward and off-screen. To stop that, the branch is **capped
-at 18 characters by default**. Normal names (`main`, `feature/foo`) show in full; only a genuinely
+at 12 characters by default**. Normal names (`main`, `feature/foo`) show in full; only a genuinely
 long one is shortened:
 
 ```
 # a 36-char branch, default cap
-[Opus 4.8] 📁 my-project ⎇ feature/s…nch-name · 🧠 65.3k/230.0k (28%) · …
+[Opus 4.8] 📁 my-project ⎇ featur…-name · 🧠 65.3k/230.0k (28%) · …
 ```
 
 - The cap is a **total character count**, ellipsis included. A branch within it shows unchanged; a
@@ -292,7 +292,7 @@ long one is shortened:
 
 | Env var | Default | What it does |
 | --- | --- | --- |
-| `CLEPSYDRE_BRANCH_MAX` | `18` | A positive integer sets the cap (total chars, middle ellipsis). `0` (or `false`/`no`/`off`) disables it → the branch shows **in full** (handy on a wide screen). |
+| `CLEPSYDRE_BRANCH_MAX` | `12` | A positive integer sets the cap (total chars, middle ellipsis). `0` (or `false`/`no`/`off`) disables it → the branch shows **in full** (handy on a wide screen). |
 
 ```json
 {
@@ -311,14 +311,14 @@ long one is shortened:
 
 The `📁` folder name sits *left* of the token gauge too, so a long project name (say
 `second-brain-generator`) pushes the gauge the same way a long branch does. Its default cap is
-**conditional on whether a git branch is also shown**: **18 characters with a branch** (it then
-shares the space left of the gauge with the branch, so both stay tight), **30 without** (a non-git
+**conditional on whether a git branch is also shown**: **12 characters with a branch** (it then
+shares the space left of the gauge with the branch, so both stay tight), **25 without** (a non-git
 working dir — the folder owns that whole space alone, so it can breathe). Normal names (`clepsydre`,
 `my-project`) show in full; only a long one is shortened:
 
 ```
-# a 22-char folder, inside a git repo (branch shown) → 18-char cap
-[Opus 4.8] 📁 second-br…enerator ⎇ main · 🧠 65.3k/230.0k (28%) · …
+# a 22-char folder, inside a git repo (branch shown) → 12-char cap
+[Opus 4.8] 📁 second…rator ⎇ main · 🧠 65.3k/230.0k (28%) · …
 ```
 
 - Same rule as the branch: a **total character count**, ellipsis included, clipped in the **middle**
@@ -326,7 +326,7 @@ working dir — the folder owns that whole space alone, so it can breathe). Norm
 
 | Env var | Default | What it does |
 | --- | --- | --- |
-| `CLEPSYDRE_FOLDER_MAX` | `18` (`30` with no git branch) | A positive integer sets the cap (total chars, middle ellipsis) and overrides the conditional default. `0` (or `false`/`no`/`off`) disables it → the folder shows **in full**. |
+| `CLEPSYDRE_FOLDER_MAX` | `12` (`25` with no git branch) | A positive integer sets the cap (total chars, middle ellipsis) and overrides the conditional default. `0` (or `false`/`no`/`off`) disables it → the folder shows **in full**. |
 
 ```json
 {

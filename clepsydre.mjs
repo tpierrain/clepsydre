@@ -236,10 +236,10 @@ export function rateInfo(rateLimits, now) {
 
 // Default cap for the rendered branch width (chars, ellipsis included). Bounded BY DEFAULT so a
 // long branch — which sits left of the token gauge — can't push tier-1 off a narrow terminal
-// (ADR 0002). Tightened 30 → 18 after field feedback: a 27-char branch under the old 30 cap still
-// crowded the gauge + memory. Normal names (main, feature/foo) show in full; a long one gets a
-// middle ellipsis.
-const DEFAULT_BRANCH_MAX = 18;
+// (ADR 0002). Tightened over two rounds of field feedback (30 → 18 → 12): even an 18-char cap still
+// let branch + folder together clip the memory segment. Normal names (main, feature/foo) show in
+// full; a long one gets a middle ellipsis.
+const DEFAULT_BRANCH_MAX = 12;
 
 // The branch-width cap, from CLEPSYDRE_BRANCH_MAX. Bounded by default (DEFAULT_BRANCH_MAX):
 //   • unset / non-numeric → the 30-char default;
@@ -254,17 +254,17 @@ export function resolveBranchMax(env = {}) {
 
 // Default folder-width caps (chars, ellipsis included), bounded BY DEFAULT for the same ADR 0002
 // reason as the branch. The default is CONDITIONAL on whether a git branch is also shown:
-//   • WITH a branch → 18, matching the branch cap: the two variable-length segments share the space
+//   • WITH a branch → 12, matching the branch cap: the two variable-length segments share the space
 //     left of tier-1, so each stays tight so neither crowds the token gauge + memory.
-//   • WITHOUT a branch → 30: the folder then owns that whole space alone (non-git working dir), so it
+//   • WITHOUT a branch → 25: the folder then owns that whole space alone (non-git working dir), so it
 //     can breathe. The 📁 folder is also more redundant than the branch — you usually know which
 //     project you're in — which is why it, not the branch, absorbs the looser figure.
-const FOLDER_MAX_WITH_BRANCH = 18;
-const FOLDER_MAX_WITHOUT_BRANCH = 30;
+const FOLDER_MAX_WITH_BRANCH = 12;
+const FOLDER_MAX_WITHOUT_BRANCH = 25;
 
 // The folder-width cap, from CLEPSYDRE_FOLDER_MAX. Same contract as resolveBranchMax, but the default
 // depends on `hasBranch` (see above):
-//   • unset / non-numeric → 18 when a branch is shown, else 30;
+//   • unset / non-numeric → 12 when a branch is shown, else 25;
 //   • a positive integer → that width (an explicit override wins regardless of hasBranch);
 //   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full folder name).
 export function resolveFolderMax(env = {}, hasBranch = false) {

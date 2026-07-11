@@ -318,8 +318,8 @@ test('truncateBranch: a branch within max passes through unchanged, no ellipsis'
   assert.equal(truncateBranch('main', 12), 'main');
 });
 
-test('resolveBranchMax: no env var falls back to the default 18-char cap (bounded by default)', () => {
-  assert.equal(resolveBranchMax({}), 18);
+test('resolveBranchMax: no env var falls back to the default 12-char cap (bounded by default)', () => {
+  assert.equal(resolveBranchMax({}), 12);
 });
 
 test('resolveBranchMax: a valid positive override wins over the default', () => {
@@ -332,9 +332,9 @@ test('resolveBranchMax: 0/off/false/no disables the cap → Infinity (full branc
   }
 });
 
-test('resolveFolderMax: no env var, conditional default — 18 with a git branch, 30 without', () => {
-  assert.equal(resolveFolderMax({}, true), 18); // a branch shares the space left of tier-1 → tighter
-  assert.equal(resolveFolderMax({}, false), 30); // no branch → the folder owns that space → looser
+test('resolveFolderMax: no env var, conditional default — 12 with a git branch, 25 without', () => {
+  assert.equal(resolveFolderMax({}, true), 12); // a branch shares the space left of tier-1 → tighter
+  assert.equal(resolveFolderMax({}, false), 25); // no branch → the folder owns that space → looser
 });
 
 test('resolveFolderMax: a valid positive override wins over the default', () => {
@@ -450,12 +450,12 @@ test('buildStatusLine: a git branch adds a ⎇ segment before the gauge', () => 
   assert.equal(line, `[Opus 4.8] 📁 my-project ⎇ main · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`);
 });
 
-test('buildStatusLine: with no branchMax a long branch is clipped at the 18-char default (bounded by default)', () => {
+test('buildStatusLine: with no branchMax a long branch is clipped at the 12-char default (bounded by default)', () => {
   const line = buildStatusLine({
     model: 'Opus 4.8', basename: 'my-project', git: { branch: 'feature/some-really-long-branch-name' },
     used: 65300, max: 230000, mem: null,
   });
-  assert.match(line, /⎇ feature\/s…nch-name ·/); // 18 total chars, head+tail, ellipsis middle
+  assert.match(line, /⎇ featur…-name ·/); // 12 total chars, head+tail, ellipsis middle
 });
 
 test('buildStatusLine: an explicit branchMax overrides the default cap', () => {
@@ -707,7 +707,7 @@ test('end-to-end: CLEPSYDRE_BRANCH_MAX clips a long branch (middle ellipsis); un
   assert.match(out, /⎇ feature\/some…branch-name ·/); // opted into a 24-char cap, head+tail kept
 });
 
-test('end-to-end: with no CLEPSYDRE_BRANCH_MAX a long branch is clipped at the 18-char default', () => {
+test('end-to-end: with no CLEPSYDRE_BRANCH_MAX a long branch is clipped at the 12-char default', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
@@ -720,31 +720,31 @@ test('end-to-end: with no CLEPSYDRE_BRANCH_MAX a long branch is clipped at the 1
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_BRANCH_MAX: '' }, // '' → default 18
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_BRANCH_MAX: '' }, // '' → default 12
   });
-  assert.match(out, /⎇ feature\/s…nch-name ·/); // bounded by default, no env needed
+  assert.match(out, /⎇ featur…-name ·/); // bounded by default, no env needed
 });
 
-test('end-to-end: no git branch → a long folder is clipped at the looser 30-char default', () => {
+test('end-to-end: no git branch → a long folder is clipped at the looser 25-char default', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
-  // A long prefix guarantees the temp basename exceeds the 30-char no-branch default cap.
+  // A long prefix guarantees the temp basename exceeds the 25-char no-branch default cap.
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-second-brain-generator-a-very-long-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
   const payload = JSON.stringify({
     model: { display_name: 'TestModel' },
-    workspace: { current_dir: work }, // not a git repo → no branch → folder owns the space → 30
+    workspace: { current_dir: work }, // not a git repo → no branch → folder owns the space → 25
     context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
   });
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }, // no FOLDER_MAX → default 30
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }, // no FOLDER_MAX → default 25
   });
   const shown = out.match(/📁 (\S+…\S+) ·/)[1]; // head + middle ellipsis + tail
-  assert.equal([...shown].length, 30); // clipped to the 30-char no-branch default
+  assert.equal([...shown].length, 25); // clipped to the 25-char no-branch default
 });
 
-test('end-to-end: inside a git repo → a long folder is clipped at the tighter 18-char default', () => {
+test('end-to-end: inside a git repo → a long folder is clipped at the tighter 12-char default', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-second-brain-generator-a-very-long-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
@@ -757,10 +757,10 @@ test('end-to-end: inside a git repo → a long folder is clipped at the tighter 
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }, // no FOLDER_MAX → default 18 (branch shown)
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }, // no FOLDER_MAX → default 12 (branch shown)
   });
   const shown = out.match(/📁 (\S+…\S+) ⎇/)[1];
-  assert.equal([...shown].length, 18); // clipped to the 18-char with-branch default
+  assert.equal([...shown].length, 12); // clipped to the 12-char with-branch default
 });
 
 test('end-to-end: CLEPSYDRE_FOLDER_MAX=0 opts out → the full folder name shows', () => {
