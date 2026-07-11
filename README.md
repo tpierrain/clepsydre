@@ -328,7 +328,10 @@ it's the first segment the terminal clips on a narrow window and can never squee
 - The data comes straight from the JSON Claude Code hands the status line — **no extra
   process, no API call, zero added cost** per render.
 - **Not on Pro/Max** (API billing), or before the session's first response? Claude Code
-  doesn't send the numbers, and the segment simply doesn't show. Nothing to configure.
+  doesn't send the numbers, and the segment simply doesn't show. Nothing to configure. This is
+  deliberate: Claude Code only reports the window *after* the first response, and the segment would
+  rather stay hidden than show a **stale, possibly misleading** figure (see
+  [ADR 0004](maintainers/docs/adr/0004-rate-window-renders-only-from-fresh-data.md)).
 - **`⏳ reset`** — the numbers only refresh with a response, so if a session sits idle
   past the reset, the last-known percentage is stale (a new window has already started).
   Rather than show a scary, wrong ⌛, the segment turns into this green marker until your

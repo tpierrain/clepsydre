@@ -3,10 +3,11 @@
 > **The single active plan.** The git-counts feature **and** both external-contributor PRs
 > (#5 effort, #4 rate-window) are shipped and released in **v1.3.0** under
 > [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md). **Active work now** (field
-> feedback 2026-07-11): **step 12** — show the rate window from session start — and **step 13** —
-> shorten the status line (it already clips on a normal terminal). Then the remaining **human-only**
-> field checks (steps 5–6). Start at the first unchecked `- [ ]`; tick boxes and note
-> _(date · commit)_ as you go.
+> feedback 2026-07-11): **step 13** — shorten the status line (it already clips on a normal terminal).
+> **Step 12** (show the rate window from session start) was **abandoned** — a startup bridge can only
+> be stale/misleading; see [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md).
+> Then the remaining **human-only** field checks (steps 5–6). Start at the first unchecked `- [ ]`;
+> tick boxes and note _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
 ## Shipped (git-counts feature — done)
@@ -78,21 +79,26 @@ placement/rendering only — driven by the documented rule, not taste.
 > visible. Two asks: **(a)** show the rate window from session start, and **(b)** shorten the line.
 > Resume here after `/clear`. Strict TDD, suite green before each commit.
 
-- [ ] **12. Rate window must show from session start, not only after the first turn.**
-      Governed by [ADR 0003](../../docs/adr/0003-information-shows-from-first-render.md) (info shows
-      from the first render unless structurally N/A). Cause: Claude Code only puts `rate_limits` in
-      the status-line JSON **after the first API response**, so `rateInfo` returns null at startup
-      and the ⏳ segment is absent until the first instruction. Thomas wants it visible immediately —
-      this is ADR-0003 case 2 (**applicable but not yet arrived** → bridge), not case 1 (no Pro/Max
-      → omit).
-  - [ ] **Confirm the cause** — inspect/log the raw stdin JSON on the very first render of a fresh
-        session: is `rate_limits` genuinely absent, or present in a different shape?
-  - [ ] **Design the fix** — likely **persist the last-seen rate window** to a small cache file
-        (e.g. under the project's memory dir) and render from cache at startup; the existing
-        stale-past-reset guard already nulls it to `⏳ reset` if the window rolled over while idle.
-        Weigh alternatives (any other Claude Code source) on cost/robustness before coding.
-  - [ ] **Implement in strict TDD** — pure cache read/write + `rateInfo` startup fallback; suite green.
-  - [ ] **Document** the new startup behaviour in the README rate-window section.
+- [x] **12. ~~Rate window must show from session start~~ — ABANDONED (won't fix).**
+      _(2026-07-11 · resolved by decision, no code change — see [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md))_
+      Governed originally by [ADR 0003](../../docs/adr/0003-information-shows-from-first-render.md).
+      Cause confirmed (field observation on v1.3.0): Claude Code only puts `rate_limits` in the
+      status-line JSON **after the first API response**, so `rateInfo` returns null at startup and the
+      ⏳ segment is absent until the first instruction. **Decision reversed** (Thomas, 2026-07-11): a
+      startup bridge can only ever be **stale** — the window is account-global, many Claude Code
+      windows share one cache, and a stale `used_percentage` misleads *dangerously* (⏳ 20% while
+      really near 90%). The only fresh source would be an intrusive throwaway API call — rejected.
+      **We prefer omitting to showing non-fresh data.** No production-code change: `rateInfo` already
+      returns null on absent `rate_limits`, which is exactly the wanted behaviour.
+  - [x] **Confirm the cause** — taken as established (documented in ADR 0003 from field observation;
+        `rate_limits` genuinely absent on the first render). _(2026-07-11)_
+  - [x] **Decide the fix** — **no cache, no bridge**; omit until fresh. Weighed alternatives: no other
+        Claude Code source persists the window (nothing under `~/.claude`); a dummy API call is too
+        intrusive. Recorded in [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md). _(2026-07-11)_
+  - [x] **Implement** — nothing to code; verified `rateInfo(undefined/{}, now) → null` is already
+        tested and green. _(2026-07-11)_
+  - [x] **Document** — README rate-window section already states the omit-until-fresh behaviour;
+        ADR 0004 captures the rationale. _(2026-07-11)_
 
 - [ ] **13. Shorten the status line — it's already at the clip edge on a normal terminal.**
       Tier-1 (tokens, memory) is structurally safe by ADR 0002, but the secondary segments crowd the

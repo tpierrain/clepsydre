@@ -1,6 +1,10 @@
 # ADR 0003 — Status-line information shows from the first render, unless it's structurally not applicable
 
-- **Status:** Accepted
+- **Status:** Accepted — **superseded in part** by
+  [ADR 0004](0004-rate-window-renders-only-from-fresh-data.md): the rate-window *bridge* below
+  (case 2, and the first *Consequences* bullet) is **reversed**. The rate window is now **omitted**
+  until fresh data arrives, because any bridge would be stale and misleading. The rest of this ADR —
+  the general "show from the first render unless structurally N/A" rule — still stands.
 - **Date:** 2026-07-11
 - **Deciders:** Thomas Pierrain (maintainer)
 - **Feature origin:** field feedback on v1.3.0 — the 5-hour rate window (`⏳ % ↻ reset`, PR #4 by
@@ -47,6 +51,10 @@ Concretely, classify every "no value" into exactly one of two cases:
    datum is late (Claude Code only sends it after the first turn). Clepsydre must **bridge the gap**
    so the segment shows from the first render — e.g. **persist the last-seen value** to a small cache
    and render from it at startup — rather than show nothing until an event happens.
+   > **Reversed for the rate window** by [ADR 0004](0004-rate-window-renders-only-from-fresh-data.md):
+   > a cache is unsound there (account-global, many windows, a stale percentage misleads *dangerously*),
+   > so the rate window is a **third case** — *applicable, late, but no trustworthy fresh source →
+   > omit until it arrives*. Bridge only where the bridged value is trustworthy.
 
 The two cases must be told apart on a **real signal**, not on "is the field present in this exact
 JSON payload". A cached last-known rate window, for instance, is evidence that case 1 does *not*
@@ -56,8 +64,10 @@ window rolled over while the session sat idle.
 
 ## Consequences
 
-- **Drives the rate-window startup fix** (ongoing plan, step 12): cache the last-seen window and
-  render it from the first paint; keep the not-on-Pro/Max omission and the stale-past-reset marker.
+- ~~**Drives the rate-window startup fix** (ongoing plan, step 12): cache the last-seen window and
+  render it from the first paint; keep the not-on-Pro/Max omission and the stale-past-reset marker.~~
+  **Reversed by [ADR 0004](0004-rate-window-renders-only-from-fresh-data.md)** — no cache; the rate
+  window is omitted until fresh data arrives. Plan step 12 is abandoned, not implemented.
 - **A general rule for future late-arriving data:** any new segment fed by a datum Claude Code sends
   lazily must bridge the startup gap the same way, or justify why it's case 1.
 - **Distinct from ADR 0002.** ADR 0002 governs *where* a segment sits (spatial: ordering encodes

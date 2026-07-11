@@ -19,7 +19,11 @@
   is when the thing genuinely doesn't exist here (no Pro/Max subscription → no rate window, outside a
   git repo → no branch, model without an effort field → no glyph): omit, never fabricate. When data
   *applies* but Claude Code sends it late, **bridge** the gap (e.g. render a cached last-seen value)
-  rather than show nothing. See [ADR 0003](docs/adr/0003-information-shows-from-first-render.md).
+  rather than show nothing — **but only when the bridged value is trustworthy**. Where the only
+  bridge would be stale and misleading (the 5-hour rate window: account-global, many windows, a stale
+  percentage lies *dangerously*), **omit honestly until fresh data arrives** instead. See
+  [ADR 0003](docs/adr/0003-information-shows-from-first-render.md) and
+  [ADR 0004](docs/adr/0004-rate-window-renders-only-from-fresh-data.md).
 
 ## Plans & resuming work
 
