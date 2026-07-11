@@ -9,6 +9,7 @@ import {
   fmtTokens, fmtBytes, tokenTier, memTier, resolveMax, pct, buildStatusLine,
   computeMemDir, readMemory, resolveThresholds, gitCounts, parseGitStatus,
   resolveGitCounts, gitInfo, resolveEffort, effortInfo, effortGlyph,
+  fmtCountdown, rateTier, resolveRateWindow, rateInfo,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -90,19 +91,23 @@ test('resolveThresholds: an empty env yields the built-in defaults', () => {
   assert.deepEqual(resolveThresholds({}), {
     token: { warn: 150000, crazy: 200000 },
     mem: { warn: 15360, rot: 25600 },
+    rate: { warn: 70, high: 90 },
   });
 });
 
-test('resolveThresholds: the four env vars override their defaults', () => {
+test('resolveThresholds: the six env vars override their defaults', () => {
   const env = {
     CLEPSYDRE_TOKEN_WARN: '120000',
     CLEPSYDRE_TOKEN_CRAZY: '180000',
     CLEPSYDRE_MEM_WARN: '10240',
     CLEPSYDRE_MEM_ROT: '20480',
+    CLEPSYDRE_RATE_WARN: '50',
+    CLEPSYDRE_RATE_HIGH: '80',
   };
   assert.deepEqual(resolveThresholds(env), {
     token: { warn: 120000, crazy: 180000 },
     mem: { warn: 10240, rot: 20480 },
+    rate: { warn: 50, high: 80 },
   });
 });
 
@@ -112,10 +117,12 @@ test('resolveThresholds: empty, non-numeric or non-positive values fall back to 
     CLEPSYDRE_TOKEN_CRAZY: 'lots', // garbage -> default
     CLEPSYDRE_MEM_WARN: '0', // non-positive -> default
     CLEPSYDRE_MEM_ROT: '-5', // negative -> default
+    CLEPSYDRE_RATE_WARN: 'half', // garbage -> default
   };
   assert.deepEqual(resolveThresholds(env), {
     token: { warn: 150000, crazy: 200000 },
     mem: { warn: 15360, rot: 25600 },
+    rate: { warn: 70, high: 90 },
   });
 });
 
@@ -135,7 +142,81 @@ test('resolveThresholds: an inverted mem pair falls back to mem defaults, token 
   assert.deepEqual(resolveThresholds(env), {
     token: { warn: 120000, crazy: 180000 },
     mem: { warn: 15360, rot: 25600 },
+    rate: { warn: 70, high: 90 },
   });
+});
+
+test('resolveRateWindow: absent flag → enabled (on by default)', () => {
+  assert.equal(resolveRateWindow({}), true);
+});
+
+test('resolveRateWindow: explicit opt-out (0/false/no/off, any case) → disabled', () => {
+  for (const v of ['0', 'false', 'NO', ' Off ']) {
+    assert.equal(resolveRateWindow({ CLEPSYDRE_RATE_WINDOW: v }), false, `value: ${v}`);
+  }
+});
+
+test('rateInfo: absent rate_limits (API users, first render) → null, segment omitted', () => {
+  assert.equal(rateInfo(undefined, 1000), null);
+  assert.equal(rateInfo({}, 1000), null);
+});
+
+test('rateInfo: percentage truncated to an integer, resetIn in seconds from now', () => {
+  const limits = { five_hour: { used_percentage: 23.9, resets_at: 10000 } };
+  assert.deepEqual(rateInfo(limits, 2020), { pct: 23, resetIn: 7980 });
+});
+
+test('rateInfo: missing resets_at → pct alone, resetIn null (countdown omitted)', () => {
+  assert.deepEqual(rateInfo({ five_hour: { used_percentage: 50 } }, 2020),
+    { pct: 50, resetIn: null });
+});
+
+test('buildStatusLine: the 5h rate-window segment is pinned to the far right, after memory (ADR 0002)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'p',
+    used: 65300, max: 230000, mem: { mdBytes: 0, dirBytes: 0, fileCount: 0 },
+    rate: { pct: 23, resetIn: 7980 },
+  });
+  assert.equal(
+    line,
+    `[Opus 4.8] 📁 p · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}` +
+      ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}` +
+      ` · ${GREEN}⏳ 23% ↻ 2h13${RESET}`,
+  );
+});
+
+test('buildStatusLine: a null resetIn drops the ↻ countdown, keeps the percent', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'p',
+    used: 65300, max: 230000, mem: null,
+    rate: { pct: 95, resetIn: null },
+  });
+  assert.equal(
+    line,
+    `[Opus 4.8] 📁 p · ${GREEN}🧠 65.3k/230.0k (28%)${RESET} · ${BOLD_RED}⌛ 95%${RESET}`,
+  );
+});
+
+test('rateInfo: resets_at beyond the 60s clock-skew grace → pct nulled, stale % dropped', () => {
+  const limits = { five_hour: { used_percentage: 92, resets_at: 1000 } };
+  assert.deepEqual(rateInfo(limits, 1061), { pct: null, resetIn: null });
+});
+
+test('rateInfo: a reset within the grace keeps the normal shape (countdown clamps to 0m)', () => {
+  const limits = { five_hour: { used_percentage: 92, resets_at: 1000 } };
+  assert.deepEqual(rateInfo(limits, 1030), { pct: 92, resetIn: -30 });
+});
+
+test('buildStatusLine: an expired rate window renders the green ⏳ reset marker, no stale %', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'p',
+    used: 65300, max: 230000, mem: null,
+    rate: { pct: null, resetIn: null },
+  });
+  assert.equal(
+    line,
+    `[Opus 4.8] 📁 p · ${GREEN}🧠 65.3k/230.0k (28%)${RESET} · ${GREEN}⏳ reset${RESET}`,
+  );
 });
 
 test('resolveGitCounts: absent flag → enabled (on by default)', () => {
@@ -207,6 +288,39 @@ test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only
     throw new Error(`unexpected git ${args.join(' ')}`);
   };
   assert.deepEqual(gitInfo('/repo', true, run), { branch: 'main', ahead: 0, behind: 0, dirty: 0 });
+});
+
+test('fmtCountdown: hours and zero-padded minutes, compact (7980s → 2h13)', () => {
+  assert.equal(fmtCountdown(7980), '2h13');
+});
+
+test('fmtCountdown: under an hour, just the minutes (2700s → 45m)', () => {
+  assert.equal(fmtCountdown(2700), '45m');
+});
+
+test('rateTier: below 70% is the green hourglass', () => {
+  assert.deepEqual(rateTier(50), { icon: '⏳', color: GREEN });
+});
+
+test('rateTier: from 70% it is the orange warning (icon keeps its trailing space)', () => {
+  assert.deepEqual(rateTier(70), { icon: '⚠️ ', color: ORANGE });
+});
+
+test('rateTier: from 90% it is the bold-red spent hourglass', () => {
+  assert.deepEqual(rateTier(90), { icon: '⌛', color: BOLD_RED });
+});
+
+test('resolveThresholds: rate defaults to warn 70 / high 90', () => {
+  assert.deepEqual(resolveThresholds({}).rate, { warn: 70, high: 90 });
+});
+
+test('rateTier: custom thresholds override the defaults (high at 95%)', () => {
+  assert.deepEqual(rateTier(92, { warn: 50, high: 95 }), { icon: '⚠️ ', color: ORANGE });
+});
+
+test('fmtCountdown: zero or negative (reset already past, clock skew) clamps to 0m', () => {
+  assert.equal(fmtCountdown(0), '0m');
+  assert.equal(fmtCountdown(-500), '0m');
 });
 
 test('resolveMax: the user CLAUDE_CODE_AUTO_COMPACT_WINDOW wins when set', () => {
@@ -518,6 +632,43 @@ test('end-to-end: git-counts flag ON but NOT a git repo → full line still rend
     `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 65.3k/1.0M (6%)${RESET}` +
       ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}\n`,
   );
+});
+
+test('end-to-end: rate_limits in the payload → the ⏳ 5h-window segment shows', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+    // 30s of slack on the epoch so a slow test run can't flip the rendered minute
+    rate_limits: { five_hour: { used_percentage: 23.5, resets_at: Math.floor(Date.now() / 1000) + 8010 } },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
+  });
+  assert.match(out, /· \x1B\[32m⏳ 23% ↻ 2h13\x1B\[0m\n$/); // green, truncated %, pinned far right (ADR 0002)
+});
+
+test('end-to-end: rate-window opted OUT (=0) → no ⏳ segment even with rate_limits present', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+    rate_limits: { five_hour: { used_percentage: 23.5, resets_at: Math.floor(Date.now() / 1000) + 8010 } },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_RATE_WINDOW: '0' },
+  });
+  assert.doesNotMatch(out, /⏳/);
 });
 
 test('end-to-end: piping Claude Code JSON prints the composed status line', () => {

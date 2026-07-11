@@ -39,7 +39,7 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 ## What you see
 
 ```
-[Opus 4.8·H] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
+[Opus 4.8·H] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f · ⏳ 23% ↻ 2h13
 ```
 
 - **Model · reasoning effort · folder · git branch** — the effort level rides *inside* the model
@@ -52,6 +52,9 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
   - 🤪 red — ≥ 200k, the stupidity zone, `/clear` now
 - **Memory weight** — size of `MEMORY.md` (reloaded in full every session) and the memory folder:
   - 🧩 green < 15K · ⚠️ orange 15–25K · 🧨 red ≥ 25K
+- **5-hour rate window** (Pro/Max plans) — how much of it you've burned, and when it resets; pinned
+  far right, so it's the first thing to clip on a narrow terminal:
+  - ⏳ green < 70% · ⚠️ orange 70–90% · ⌛ red ≥ 90%
 
 Plenty of headroom — 🧠 green, you're fine:
 
@@ -76,6 +79,7 @@ Reading the example line above from left to right:
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
 | `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
 | `mem 18.0K/12f` | The **whole memory folder**: `18.0K` total across every memory file, `12f` = **12 files**. Reads on demand, so it doesn't cost context the way `MEMORY.md` does — this is just its footprint on disk. |
+| `⏳ 23% ↻ 2h13` | Your **5-hour rate window** (Pro/Max plans) — *on by default, opt-out* (see [rate window](#the-5-hour-rate-window-on-by-default-opt-out)). `23%` of the window already used, `↻ 2h13` until it resets. ⏳ green → ⚠️ orange (≥ 70%) → ⌛ red (≥ 90%). **Pinned far right** ([ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md)) — first to clip on a narrow terminal, so it never squeezes the token gauge. Not on a subscription plan? The segment simply doesn't show. |
 
 ## Why it matters
 
@@ -197,7 +201,7 @@ up to roughly 300–400k. Pick what fits your context — Clepsydre will show it
 
 The tier colors flip at sensible defaults, but **changing a threshold is configuration,
 not code** — so you set it in your own `settings.json`, never by editing `clepsydre.mjs`
-(that file stays identical for everyone, so `git pull` keeps working). Four optional env
+(that file stays identical for everyone, so `git pull` keeps working). Six optional env
 vars, each defaulting to today's behavior:
 
 | Env var | Default | Tier it moves |
@@ -206,6 +210,8 @@ vars, each defaulting to today's behavior:
 | `CLEPSYDRE_TOKEN_CRAZY` | `200000` | ⚠️ → 🤪 (stupidity zone) |
 | `CLEPSYDRE_MEM_WARN` | `15360` | 🧩 → ⚠️ (`MEMORY.md`, bytes) |
 | `CLEPSYDRE_MEM_ROT` | `25600` | ⚠️ → 🧨 (`MEMORY.md`, bytes) |
+| `CLEPSYDRE_RATE_WARN` | `70` | ⏳ → ⚠️ (5h window, %) |
+| `CLEPSYDRE_RATE_HIGH` | `90` | ⚠️ → ⌛ (5h window, %) |
 
 **Where to set them:**
 
@@ -305,6 +311,43 @@ To **opt out**, set it in the same `"env"` block, globally or per-project (see a
 }
 ```
 
+## The 5-hour rate window (on by default, opt-out)
+
+On Claude Pro/Max subscription plans, usage is metered over a rolling **5-hour window**.
+Clepsydre shows where you stand, out of the box — **pinned to the far right** of the line, so
+it's the first segment the terminal clips on a narrow window and can never squeeze the token gauge
+([ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md)):
+
+```
+[Opus 4.8] 📁 my-project ⎇ main · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f · ⏳ 23% ↻ 2h13
+```
+
+- **⏳ 23%** of the window already used · **↻ 2h13** until it resets (just `↻ 45m` under an
+  hour). The icon follows the usual traffic light: ⏳ green → ⚠️ orange (≥ 70%) → ⌛ red
+  (≥ 90%) — thresholds movable via `CLEPSYDRE_RATE_WARN` / `CLEPSYDRE_RATE_HIGH` (see above).
+- The data comes straight from the JSON Claude Code hands the status line — **no extra
+  process, no API call, zero added cost** per render.
+- **Not on Pro/Max** (API billing), or before the session's first response? Claude Code
+  doesn't send the numbers, and the segment simply doesn't show. Nothing to configure.
+- **`⏳ reset`** — the numbers only refresh with a response, so if a session sits idle
+  past the reset, the last-known percentage is stale (a new window has already started).
+  Rather than show a scary, wrong ⌛, the segment turns into this green marker until your
+  next message brings fresh numbers.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_RATE_WINDOW` | *(on)* | `0` (or `false`/`no`/`off`) hides the ⏳ 5h-window segment |
+
+To **opt out**, same `"env"` block as everything else, globally or per-project:
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_RATE_WINDOW": "0"
+  }
+}
+```
+
 ## Requirements
 
 - **Node.js** — already present on any machine running Claude Code (that's what it runs
@@ -321,7 +364,7 @@ To **opt out**, set it in the same `"env"` block, globally or per-project (see a
 Clepsydre is better because people sent great ideas upstream. Huge thanks to:
 
 - **[@guillaumejay](https://github.com/guillaumejay)** — the **git `↑ahead ↓behind ±dirty`
-  counts** (on by default).
+  counts** (on by default) and the **5-hour rate-limit window** (`⏳ 23% ↻ 2h13`).
 - **[@anaelChardan](https://github.com/anaelChardan)** — the **reasoning-effort** indicator
   (`[Opus 4.8·H]`), surfacing your live `/effort` level right in the model bracket.
 
