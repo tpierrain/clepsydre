@@ -179,6 +179,25 @@ export function compactModelName(name) {
   return name.replace(/\s*\(.*\)\s*$/, '');
 }
 
+// Format the model offering's context window as a short badge — 1000000 → "1M", 200000 → "200k".
+// Source is the real integer Claude Code reports (context_window_size), NOT the marketing name: a
+// standard model is just "Sonnet 4.6" (its name carries no size), yet it genuinely exposes 200000,
+// so only the integer lets us show "200k". Real data, never a hardcoded model→size table (which
+// would rot the moment Anthropic reshuffles its lineup). A trailing ".0" is trimmed so round sizes
+// read clean ("1M", not "1.0M"). Returns null for an absent / non-positive value → honest omit.
+export function fmtWindowSize(n) {
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const trim = (x) => String(Number(x.toFixed(1))); // 1.0 → "1", 1.5 → "1.5", 200 → "200"
+  if (n >= 1_000_000) return `${trim(n / 1_000_000)}M`;
+  if (n >= 1_000) return `${trim(n / 1_000)}k`;
+  return String(n);
+}
+
+// The model-window badge is on by default; opt out with CLEPSYDRE_MODEL_MAX=0/off/false/no.
+export function resolveModelMax(env = {}) {
+  return enabledUnlessOptedOut(env.CLEPSYDRE_MODEL_MAX);
+}
+
 // Pure extraction of the reasoning-effort level from Claude Code's `effort` input:
 // the level string (low|medium|high|xhigh|max) or null when unavailable — the field
 // only exists when the current model supports the effort parameter, so null means
@@ -253,7 +272,7 @@ export function resolveFolderMax(env = {}) {
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, basename, git, used, max, mem, effort, rate, thresholds, branchMax = resolveBranchMax(), folderMax = resolveFolderMax() }) {
+export function buildStatusLine({ model, modelMax, basename, git, used, max, mem, effort, rate, thresholds, branchMax = resolveBranchMax(), folderMax = resolveFolderMax() }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
@@ -261,7 +280,10 @@ export function buildStatusLine({ model, basename, git, used, max, mem, effort, 
   // and glued inside the [model] bracket with a middot — so it stays left-most and can never
   // grow the line or evict the token gauge. A null effort leaves the bracket bare.
   const effortTag = effort ? `·${effortGlyph(effort)}` : '';
-  let out = `[${model}${effortTag}] 📁 ${truncateMiddle(basename, folderMax)}`;
+  // The offering's context-window size (e.g. "1M") qualifies the model, so it sits right after the
+  // name and before the effort glyph: [Opus 4.8 1M·H]. Omitted when unknown (null), never guessed.
+  const maxTag = modelMax ? ` ${modelMax}` : '';
+  let out = `[${model}${maxTag}${effortTag}] 📁 ${truncateMiddle(basename, folderMax)}`;
   if (git?.branch) {
     out += ` ⎇ ${truncateBranch(git.branch, branchMax)}`;
     const counts = gitCounts(git.ahead, git.behind, git.dirty);
@@ -409,6 +431,8 @@ export function main() {
   const cw = input.context_window ?? {};
   const used = (cw.total_input_tokens ?? 0) + (cw.total_output_tokens ?? 0);
   const max = resolveMax(process.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW, cw.context_window_size);
+  // The model offering's own context window (real integer, not the working-window denominator).
+  const modelMax = resolveModelMax(process.env) ? fmtWindowSize(cw.context_window_size) : null;
 
   const transcript =
     input.transcript_path && input.transcript_path !== 'null' ? input.transcript_path : '';
@@ -421,6 +445,7 @@ export function main() {
     : null;
   const line = buildStatusLine({
     model,
+    modelMax,
     basename: path.basename(dir),
     git,
     used,

@@ -158,6 +158,30 @@ placement/rendering only — driven by the documented rule, not taste.
       ("The One That Trims the Long Names"): move the `v1.4.0` tag to the folder-cap commit, push it,
       and add a folder-cap highlight to the existing release notes. No MINOR bump.
 
+## Next up — model window-size badge (field feedback, 2026-07-11)
+
+> From Thomas: after v1.4.0 the bracket lost the offering qualifier (my `compactModelName` stripped
+> `(1M context)`). He wants the **model's exposed context window** shown as a badge — `1M`, and `200k`
+> when the model exposes 200 000. Confirmed via a real captured payload: `context_window_size` is the
+> reliable source (1000000 / 200000), independent of the 300k working-window override. Decision:
+> **always show it** (not only when it differs), from the integer, never a hardcoded table. Rendering
+> `1M·H` glued to the model. Strict TDD, suite green before each commit.
+
+- [x] **17. Model window-size badge — real integer, never guessed.**
+      _(2026-07-11 · strict TDD, suite green at 119 · [ADR 0005](../../docs/adr/0005-model-window-badge-from-real-info-only.md))_
+  - [x] `fmtWindowSize(n)` pure helper (1000000 → "1M", 200000 → "200k", ".0" trimmed, null on
+        absent/non-positive) + `resolveModelMax(env)` opt-out (`CLEPSYDRE_MODEL_MAX`).
+  - [x] Thread `modelMax` through `buildStatusLine` (badge glued to the model, before the effort glyph)
+        and wire `fmtWindowSize(cw.context_window_size)` in `main`. Decoupled 5 badge-agnostic e2e via
+        `CLEPSYDRE_MODEL_MAX=0`; added a standard-200k e2e.
+  - [x] README (What you see / How to read it / "Model window size" section) + ADR 0005.
+  - [x] **Mac/Windows** (Thomas' explicit ask): feature is pure `Number`/`String` — no fs/path/shell/
+        locale dependency (`toFixed` is locale-independent) → identical on both. Verified by static
+        review + full green suite (node:test = the cross-platform contract). No new Windows risk added;
+        the pre-existing Windows field-checks below (step 5) are unchanged and still human-only.
+- [ ] **18. Release** — decide fold-vs-new-version with Thomas (new user-facing feature → likely a
+      MINOR, unlike the folder cap which folded into v1.4.0's theme).
+
 ## Remaining — human-only field checks (no code)
 
 These can't be done from this dev Mac: they need a fresh install on the *other* machines. A

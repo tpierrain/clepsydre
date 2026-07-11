@@ -39,17 +39,19 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 ## What you see
 
 ```
-[Opus 4.8·H] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f · ⏳ 23% ↻ 2h13
+[Opus 4.8 1M·H] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f · ⏳ 23% ↻ 2h13
 ```
 
 Here it is live, with every segment on screen:
 
 ![Clepsydre status line, all segments: [Opus 4.8·H] folder clepsydre, branch main, 40.6k/300.0k (13%) green, MEMORY.md 0B, mem 0B/0f, rate window 8% resets in 4h05](assets/statusline-overview.png)
 
-- **Model · reasoning effort · folder · git branch** — the effort level rides *inside* the model
-  bracket as a single glyph (`·L`/`·M`/`·H`/`·xH`/`·MAX`), so `[Opus 4.8·H]` = Opus 4.8 thinking at
-  **high**. It tracks live `/effort` changes, and the bracket stays bare when the model has no
-  effort setting.
+- **Model · window size · reasoning effort · folder · git branch** — the model bracket packs
+  three things: the model name, the **context window it exposes** as a compact badge (e.g. `1M`,
+  `200k`), and the **effort** level as a single glyph (`·L`/`·M`/`·H`/`·xH`/`·MAX`). So `[Opus 4.8 1M·H]`
+  = Opus 4.8, a 1M-token window, thinking at **high**. The size is the real number Claude Code reports
+  for the model — never guessed, never a hardcoded table. The effort tracks live `/effort` changes,
+  and the bracket drops whatever doesn't apply.
 - **Live token usage** vs your working window, colored by the anti-context-rot threshold:
   - 🧠 green — you're fine
   - ⚠️ orange — ≥ 150k, ease off
@@ -75,7 +77,7 @@ Reading the example line above from left to right:
 
 | Piece | Means |
 | --- | --- |
-| `[Opus 4.8·H]` | The **model** currently answering you, with its **reasoning effort** compacted to a single glyph right after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here `·H` = *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)). Tracks live `/effort` changes; the bracket stays bare (`[Opus 4.8]`) when the model has no effort setting. A trailing parenthetical qualifier is dropped (`Opus 4.8 (1M context)` → `Opus 4.8`) to keep the label short. |
+| `[Opus 4.8 1M·H]` | The **model** currently answering you. `1M` is the **context window it exposes** (`1M`, `200k`, …) — the real size Claude Code reports for the model, compacted to a short badge; *on by default, opt-out* via `CLEPSYDRE_MODEL_MAX` (see [model window size](#model-window-size-on-by-default-opt-out)). Never guessed, never a hardcoded table. `·H` is the **reasoning effort** compacted to a single glyph after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)); tracks live `/effort` changes. The bracket drops whatever doesn't apply (`[Opus 4.8]` when there's neither). |
 | `📁 my-project` | The **folder** (project) you're working in. Capped at 20 chars by default (middle ellipsis); tune or disable with `CLEPSYDRE_FOLDER_MAX` (see [bounding a long folder name](#bounding-a-long-folder-name-on-by-default)). |
 | `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Capped at 30 chars by default (middle ellipsis); tune or disable with `CLEPSYDRE_BRANCH_MAX` (see [bounding a long branch name](#bounding-a-long-branch-name-on-by-default)). Outside a repo, this whole part just disappears. |
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
@@ -335,6 +337,44 @@ show in full; only a long one is shortened:
 
 > Same rationale as the branch cap — a secondary, variable-length segment must never evict the
 > token gauge to its left ([ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md)).
+
+## Model window size (on by default, opt-out)
+
+Clepsydre shows the **context window the current model exposes** as a compact badge inside the
+`[model]` bracket, right after the name:
+
+```
+[Opus 4.8 1M·H] 📁 my-project ⎇ main · 🧠 65.3k/300.0k (22%) · …
+```
+
+- The badge is the model's real window (`1M`, `200k`, …), read from the size **Claude Code reports in
+  the payload** (`context_window_size`) — the actual number, not the marketing name. A standard model
+  is just named `Sonnet 4.6`, yet it genuinely exposes 200 000 tokens, so we can still show `200k`.
+- **Never guessed, never a hardcoded `model → size` table** — which would rot the moment Anthropic
+  reshuffles its lineup or renames a tier. If Claude Code reports no size, the badge is simply
+  omitted. This keeps it honest and future-proof.
+- It's the model's **exposed ceiling**, distinct from the `/…` **working window** in the token gauge
+  (which you narrow with `CLAUDE_CODE_AUTO_COMPACT_WINDOW` — see [the working
+  window](#the-working-window)). So `1M` next to `65.3k/300.0k` reads: *a 1M-capable model, worked
+  within a 300k window, 65.3k used.* When you haven't narrowed it, the badge simply matches the
+  gauge's denominator.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_MODEL_MAX` | *(on)* | `0` (or `false`/`no`/`off`) hides the size badge |
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_MODEL_MAX": "0"
+  }
+}
+```
+
+> Why glued to the model? The window size *qualifies the model* — it belongs with its identity, and
+> staying a short left-anchored badge keeps the token gauge protected from the right-edge clip. See
+> [ADR 0005](maintainers/docs/adr/0005-model-window-badge-from-real-info-only.md) for why we only ever
+> surface real, reported info here — never a guess.
 
 ## Reasoning effort (on by default, opt-out)
 

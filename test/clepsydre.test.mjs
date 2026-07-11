@@ -11,6 +11,7 @@ import {
   resolveGitCounts, gitInfo, resolveEffort, effortInfo, effortGlyph,
   fmtCountdown, rateTier, resolveRateWindow, rateInfo, compactModelName,
   truncateBranch, resolveBranchMax, truncateMiddle, resolveFolderMax,
+  fmtWindowSize, resolveModelMax,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -290,6 +291,24 @@ test('compactModelName: a name with no parenthetical passes through unchanged', 
   assert.equal(compactModelName('Sonnet 4.6'), 'Sonnet 4.6');
 });
 
+test('fmtWindowSize: a millions window trims to a clean "1M" (not "1.0M")', () => {
+  assert.equal(fmtWindowSize(1_000_000), '1M');
+});
+
+test('fmtWindowSize: a standard window formats to "200k" (real integer, not the name)', () => {
+  assert.equal(fmtWindowSize(200_000), '200k');
+});
+
+test('fmtWindowSize: a non-round millions window keeps one decimal ("1.5M")', () => {
+  assert.equal(fmtWindowSize(1_500_000), '1.5M');
+});
+
+test('fmtWindowSize: an absent / non-positive value → null (honest omit, never guessed)', () => {
+  assert.equal(fmtWindowSize(undefined), null);
+  assert.equal(fmtWindowSize(0), null);
+  assert.equal(fmtWindowSize(-1), null);
+});
+
 test('truncateBranch: a branch wider than max keeps its head AND tail, ellipsis in the middle', () => {
   // head + '…' + tail, total = max: the distinctive prefix (feature/…) and suffix (…-here) both survive.
   assert.equal(truncateBranch('feature/very-long-name-here', 12), 'featur…-here');
@@ -537,6 +556,24 @@ test('buildStatusLine: a null effort leaves the [model] bracket bare (segment om
   assert.equal(line, `[Opus 4.8] 📁 p · ${GREEN}🧠 1.0k/230.0k (0%)${RESET}`);
 });
 
+test('buildStatusLine: a modelMax badge is glued to the model name, before the effort glyph', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', modelMax: '1M', basename: 'my-project', git: { branch: 'main' },
+    used: 65300, max: 230000, mem: null, effort: 'high',
+  });
+  assert.equal(
+    line,
+    `[Opus 4.8 1M·H] 📁 my-project ⎇ main · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`,
+  );
+});
+
+test('buildStatusLine: a null modelMax leaves the bracket without a size badge (segment omitted)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', modelMax: null, basename: 'p', used: 1000, max: 230000, mem: null, effort: 'high',
+  });
+  assert.equal(line, `[Opus 4.8·H] 📁 p · ${GREEN}🧠 1.0k/230.0k (0%)${RESET}`);
+});
+
 test('buildStatusLine: a memory folder appends the colored MEMORY.md weight segment', () => {
   const line = buildStatusLine({
     model: 'Opus 4.8', basename: 'my-project', git: { branch: 'main' },
@@ -620,7 +657,7 @@ test('end-to-end: CLEPSYDRE_* env vars retune the token tier color', () => {
     input: payload,
     encoding: 'utf8',
     env: {
-      ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_FOLDER_MAX: '0',
+      ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_FOLDER_MAX: '0', CLEPSYDRE_MODEL_MAX: '0',
       CLEPSYDRE_TOKEN_WARN: '190000', CLEPSYDRE_TOKEN_CRAZY: '250000',
     },
   });
@@ -773,7 +810,7 @@ test('end-to-end: git-counts flag ON but NOT a git repo → full line still rend
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '1', CLEPSYDRE_FOLDER_MAX: '0' },
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '1', CLEPSYDRE_FOLDER_MAX: '0', CLEPSYDRE_MODEL_MAX: '0' },
   });
   // A git failure with counts ON costs only the git segment: the rest of the bar is intact.
   assert.equal(
@@ -832,7 +869,7 @@ test('end-to-end: piping Claude Code JSON prints the composed status line', () =
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_FOLDER_MAX: '0' },
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_FOLDER_MAX: '0', CLEPSYDRE_MODEL_MAX: '0' },
   });
   // No memory folder here, so the segment is shown empty (0B/0f) rather than dropped.
   assert.equal(
@@ -840,6 +877,42 @@ test('end-to-end: piping Claude Code JSON prints the composed status line', () =
     `[TestModel] 📁 ${path.basename(work)} · ${GREEN}🧠 65.3k/1.0M (6%)${RESET}` +
       ` · ${GREEN}🧩 MEMORY.md 0B · mem 0B/0f${RESET}\n`,
   );
+});
+
+test('end-to-end: a "(1M context)" offering surfaces the size badge in the bracket', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'Opus 4.8 (1M context)' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+    effort: { level: 'high' },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_FOLDER_MAX: '0' },
+  });
+  assert.match(out, /^\[Opus 4\.8 1M·H\] /); // name compacted, size badge kept, effort glyph
+});
+
+test('end-to-end: CLEPSYDRE_MODEL_MAX=0 opts out → no size badge, bare bracket', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'Opus 4.8 (1M context)' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+    effort: { level: 'high' },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_MODEL_MAX: '0' },
+  });
+  assert.match(out, /^\[Opus 4\.8·H\] /); // opted out: no badge
 });
 
 test('end-to-end: effort in the payload → the glyph is glued inside the [model] bracket', () => {
@@ -855,26 +928,28 @@ test('end-to-end: effort in the payload → the glyph is glued inside the [model
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_MODEL_MAX: '0' },
   });
   assert.match(out, /^\[TestModel·H\] /); // effort compacted to a glyph, anchored to the model
 });
 
-test('end-to-end: a parenthetical model qualifier is stripped in the [model] bracket', () => {
+test('end-to-end: a standard 200k model shows a "200k" badge (from the real integer, name has no size)', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
   const payload = JSON.stringify({
-    model: { display_name: 'Opus 4.8 (1M context)' },
+    model: { display_name: 'Sonnet 4.6' }, // no "(… context)" in the name
     workspace: { current_dir: work },
-    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 200000 },
   });
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
   });
-  assert.match(out, /^\[Opus 4\.8\] /); // "(1M context)" dropped so the label stays short (ADR 0002)
+  // The name carries no size, yet the model genuinely exposes 200000 → we surface "200k" from the
+  // real context_window_size integer, never guessed.
+  assert.match(out, /^\[Sonnet 4\.6 200k\] /);
 });
 
 test('end-to-end: effort opted OUT (=0) → the [model] bracket stays bare even with effort present', () => {
@@ -890,7 +965,7 @@ test('end-to-end: effort opted OUT (=0) → the [model] bracket stays bare even 
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_EFFORT: '0' },
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_EFFORT: '0', CLEPSYDRE_MODEL_MAX: '0' },
   });
   assert.match(out, /^\[TestModel\] /); // bare bracket — no ·MAX
 });
