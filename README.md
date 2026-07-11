@@ -12,7 +12,7 @@
 lives in your status line and shows — every turn, without you asking — how full your
 context is, so you can `/clear` at exactly the right moment.
 
-![Clepsydre status line, warning tier: [Opus 4.8 1M·H] folder second…rator, branch test/r…ening ±6, 183.8k/300.0k (61%) with the ⚠️ ease-off icon, MEMORY.md 9.1K, mem 140.0K/40f, rate window 39% resets in 1h22](assets/statusline-warn.png)
+![Clepsydre status line, red tier: [Opus 4.8 1M·H] folder second…rator, branch test/r…ening ±6, 262.3k/300.0k (87%) deep in the 🤪 stupidity zone, MEMORY.md 9.1K, mem 140.0K/40f, 2% until auto-compact](assets/statusline-red.png)
 
 > **Why "Clepsydre"?** A *clepsydra* is a water clock. In *Fort Boyard*, it slowly fills
 > the room until the door locks and you're trapped — *"Sors ! Sors ! Sors !"*. Your
@@ -65,6 +65,10 @@ Here it is live, with every segment on screen:
 Plenty of headroom — 🧠 green, you're fine:
 
 ![Clepsydre status line, green tier: 119.2k/300.0k (39%)](assets/statusline-green.png)
+
+Past the warn threshold — ⚠️ orange, ease off before it gets worse:
+
+![Clepsydre status line, warning tier: 183.8k/300.0k (61%), ⚠️ ease-off icon](assets/statusline-warn.png)
 
 Deep in the stupidity zone — 🤪 bold red, `/clear` now:
 
