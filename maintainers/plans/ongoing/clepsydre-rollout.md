@@ -179,8 +179,9 @@ placement/rendering only — driven by the documented rule, not taste.
         locale dependency (`toFixed` is locale-independent) → identical on both. Verified by static
         review + full green suite (node:test = the cross-platform contract). No new Windows risk added;
         the pre-existing Windows field-checks below (step 5) are unchanged and still human-only.
-- [ ] **18. Release** — decide fold-vs-new-version with Thomas (new user-facing feature → likely a
-      MINOR, unlike the folder cap which folded into v1.4.0's theme).
+- [x] **18. Folded into v1.4.0** (Thomas' choice, 2026-07-11) — thematically coherent: v1.4.0 already
+      compacted the model label; this keeps the window size in that tight label. Tag moved to `dc00d2e`,
+      the "shorter model label" highlight reworked to the badge story. No new version.
 
 ## Remaining — human-only field checks (no code)
 
