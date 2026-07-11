@@ -1,9 +1,37 @@
-# 🏺 Clepsydre — responsive width caps (prospective)
+# 🏺 Clepsydre — responsive width caps (ongoing)
 
-> **Prospective — maybe someday, not scheduled, not active work.** When this becomes the thing
-> to do next, move the file into [`../ongoing/`](../ongoing/) (one ongoing plan at a time) and
-> start at the first unchecked `- [ ]`. Idea origin: Thomas, 2026-07-11 — *"could we read the
-> terminal width and adapt, so we don't truncate for nothing on a wide terminal?"*
+> **Active plan.** Promoted from `prospective/` on 2026-07-11 (the rollout plan has only
+> human-only field checks left, no code). Resume at the first unchecked `- [ ]` in **Tracking**.
+> Idea origin: Thomas, 2026-07-11 — *"could we read the terminal width and adapt, so we don't
+> truncate for nothing on a wide terminal?"*
+
+## Tracking
+
+- [x] **Gate — does Claude Code expose the terminal width?** PASSED (`COLUMNS` env, verified live).
+- [x] **1. Bands, not pixel-fitting** — decided below _(2026-07-11)_.
+- [x] **2. Backward-compatible fallback = today's caps** — `responsiveCap` non-number guard → tight; 128 tests green _(2026-07-11)_.
+- [x] **3. ADR 0002 invariant preserved** — override wins first, then responsive default (expansion only) _(2026-07-11)_.
+- [x] **4. TDD the pure `responsiveCap` resolver + wire it into the cap resolvers** — 8 new tests, wired into `resolveBranchMax`/`resolveFolderMax`; `main()` unchanged (already passes `process.env`); smoke-tested at 80/120/200 cols _(2026-07-11)_.
+- [x] **5. New ADR** — [`0006-responsive-width-caps.md`](../../docs/adr/0006-responsive-width-caps.md), cross-linked from ADR 0002; invariant restated as unchanged _(2026-07-11)_.
+- [ ] **6. README + release** — MINOR bump, *"The One That…"*.
+  - [x] README documents the responsive behaviour + `COLUMNS` (new "Responsive to your terminal width" section + both cap sections + top table) _(2026-07-11)_.
+  - [ ] Commit the change (awaiting explicit go from Thomas).
+  - [ ] Bump version + publish the release (MINOR, *"The One That…"* title).
+- [ ] **7. Field checks** — validate bands on real terminals (Mac + Windows, narrow + wide).
+
+### Band decision (step 1) — three bands, conservative medium
+
+`COLUMNS` (integer) selects one of three bands. `wide → Infinity` follows the plan's sketch (full
+names); the medium caps are sized so that even at the band's **narrowest** column count, the fixed
+overhead + folder + branch still leaves the token gauge on screen (ADR 0002 invariant).
+
+| Band   | `COLUMNS`   | branch | folder (with branch) | folder (no branch) |
+|--------|-------------|--------|----------------------|--------------------|
+| narrow | `< 100`     | 12     | 12                   | 25                 |
+| medium | `100–159`   | 20     | 20                   | 40                 |
+| wide   | `≥ 160`     | ∞      | ∞                    | ∞                  |
+
+_Narrow = today's exact caps (zero regression). Numbers are field-tunable (step 7)._
 
 ## Why
 

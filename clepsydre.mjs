@@ -240,16 +240,20 @@ export function rateInfo(rateLimits, now) {
 // let branch + folder together clip the memory segment. Normal names (main, feature/foo) show in
 // full; a long one gets a middle ellipsis.
 const DEFAULT_BRANCH_MAX = 12;
+const MEDIUM_BRANCH_MAX = 20;
 
-// The branch-width cap, from CLEPSYDRE_BRANCH_MAX. Bounded by default (DEFAULT_BRANCH_MAX):
-//   • unset / non-numeric → the 30-char default;
-//   • a positive integer → that width;
-//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full branch, for wide screens).
+// The branch-width cap, from CLEPSYDRE_BRANCH_MAX (an explicit override) else responsive on COLUMNS:
+//   • a positive integer in CLEPSYDRE_BRANCH_MAX → that width (an explicit override always wins);
+//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full branch, for wide screens);
+//   • otherwise → the width-aware default (responsiveCap on COLUMNS): 12 narrow, 20 medium, ∞ wide;
+//     an absent / non-numeric COLUMNS falls back to the tight 12 — today's behaviour, zero regression.
 // Truncated to an integer since it drives string slicing.
 export function resolveBranchMax(env = {}) {
   const raw = env.CLEPSYDRE_BRANCH_MAX;
   if (!enabledUnlessOptedOut(raw)) return Infinity; // 0/off/false/no → uncapped
-  return Math.trunc(positiveOr(raw, DEFAULT_BRANCH_MAX));
+  const override = positiveOr(raw, null); // an explicit CLEPSYDRE_BRANCH_MAX still wins
+  if (override !== null) return Math.trunc(override);
+  return responsiveCap(positiveOr(env.COLUMNS, NaN), DEFAULT_BRANCH_MAX, MEDIUM_BRANCH_MAX);
 }
 
 // Default folder-width caps (chars, ellipsis included), bounded BY DEFAULT for the same ADR 0002
@@ -261,17 +265,34 @@ export function resolveBranchMax(env = {}) {
 //     project you're in — which is why it, not the branch, absorbs the looser figure.
 const FOLDER_MAX_WITH_BRANCH = 12;
 const FOLDER_MAX_WITHOUT_BRANCH = 25;
+const FOLDER_MEDIUM_WITH_BRANCH = 20;
+const FOLDER_MEDIUM_WITHOUT_BRANCH = 40;
 
-// The folder-width cap, from CLEPSYDRE_FOLDER_MAX. Same contract as resolveBranchMax, but the default
-// depends on `hasBranch` (see above):
-//   • unset / non-numeric → 12 when a branch is shown, else 25;
-//   • a positive integer → that width (an explicit override wins regardless of hasBranch);
-//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full folder name).
+// The folder-width cap, from CLEPSYDRE_FOLDER_MAX (an explicit override) else responsive on COLUMNS.
+// Same contract as resolveBranchMax, but the responsive default depends on `hasBranch` (see above):
+//   • a positive integer in CLEPSYDRE_FOLDER_MAX → that width (an explicit override always wins);
+//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full folder name);
+//   • otherwise → the width-aware default (responsiveCap on COLUMNS): with a branch 12/20/∞,
+//     without a branch 25/40/∞ (narrow/medium/wide). Absent / non-numeric COLUMNS → the tight
+//     default (12 or 25) — today's behaviour, zero regression.
 export function resolveFolderMax(env = {}, hasBranch = false) {
   const raw = env.CLEPSYDRE_FOLDER_MAX;
   if (!enabledUnlessOptedOut(raw)) return Infinity; // 0/off/false/no → uncapped
-  const def = hasBranch ? FOLDER_MAX_WITH_BRANCH : FOLDER_MAX_WITHOUT_BRANCH;
-  return Math.trunc(positiveOr(raw, def));
+  const override = positiveOr(raw, null); // an explicit CLEPSYDRE_FOLDER_MAX still wins
+  if (override !== null) return Math.trunc(override);
+  const tight = hasBranch ? FOLDER_MAX_WITH_BRANCH : FOLDER_MAX_WITHOUT_BRANCH;
+  const medium = hasBranch ? FOLDER_MEDIUM_WITH_BRANCH : FOLDER_MEDIUM_WITHOUT_BRANCH;
+  return responsiveCap(positiveOr(env.COLUMNS, NaN), tight, medium);
+}
+
+// Width-aware cap resolver (pure). Picks a cap from the terminal width (COLUMNS) using
+// CSS-style bands — never by measuring the composed line (the line is full of double-width
+// glyphs; true fitting is fragile). Narrow terminals keep the tight cap; wider ones expand.
+export function responsiveCap(columns, tight, medium) {
+  if (!Number.isFinite(columns)) return tight; // unknown width → today's fixed cap (zero regression)
+  if (columns >= 160) return Infinity;
+  if (columns >= 100) return medium;
+  return tight;
 }
 
 // Compose the whole status line from already-resolved primitives (pure — no stdin,

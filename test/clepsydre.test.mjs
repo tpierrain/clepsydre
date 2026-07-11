@@ -11,7 +11,7 @@ import {
   resolveGitCounts, gitInfo, resolveEffort, effortInfo, effortGlyph,
   fmtCountdown, rateTier, resolveRateWindow, rateInfo, compactModelName,
   truncateBranch, resolveBranchMax, truncateMiddle, resolveFolderMax,
-  fmtWindowSize, resolveModelMax,
+  fmtWindowSize, resolveModelMax, responsiveCap,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -326,6 +326,16 @@ test('resolveBranchMax: a valid positive override wins over the default', () => 
   assert.equal(resolveBranchMax({ CLEPSYDRE_BRANCH_MAX: '40' }), 40);
 });
 
+test('resolveBranchMax: COLUMNS widens the default cap (responsive) — 12 narrow, 20 medium, ∞ wide', () => {
+  assert.equal(resolveBranchMax({ COLUMNS: '80' }), 12);       // narrow → today's cap
+  assert.equal(resolveBranchMax({ COLUMNS: '120' }), 20);      // medium → looser
+  assert.equal(resolveBranchMax({ COLUMNS: '200' }), Infinity); // wide → full branch name
+});
+
+test('resolveBranchMax: an explicit override still wins over the responsive default', () => {
+  assert.equal(resolveBranchMax({ CLEPSYDRE_BRANCH_MAX: '40', COLUMNS: '80' }), 40);
+});
+
 test('resolveBranchMax: 0/off/false/no disables the cap → Infinity (full branch, opt-out)', () => {
   for (const off of ['0', 'off', 'false', 'no', 'OFF']) {
     assert.equal(resolveBranchMax({ CLEPSYDRE_BRANCH_MAX: off }), Infinity);
@@ -341,9 +351,42 @@ test('resolveFolderMax: a valid positive override wins over the default', () => 
   assert.equal(resolveFolderMax({ CLEPSYDRE_FOLDER_MAX: '28' }), 28);
 });
 
+test('resolveFolderMax: COLUMNS widens the default cap, per hasBranch (responsive)', () => {
+  // with a branch: 12 narrow → 20 medium → ∞ wide
+  assert.equal(resolveFolderMax({ COLUMNS: '80' }, true), 12);
+  assert.equal(resolveFolderMax({ COLUMNS: '120' }, true), 20);
+  assert.equal(resolveFolderMax({ COLUMNS: '200' }, true), Infinity);
+  // without a branch (folder owns the space): 25 narrow → 40 medium → ∞ wide
+  assert.equal(resolveFolderMax({ COLUMNS: '80' }, false), 25);
+  assert.equal(resolveFolderMax({ COLUMNS: '120' }, false), 40);
+  assert.equal(resolveFolderMax({ COLUMNS: '200' }, false), Infinity);
+});
+
+test('resolveFolderMax: an explicit override still wins over the responsive default', () => {
+  assert.equal(resolveFolderMax({ CLEPSYDRE_FOLDER_MAX: '28', COLUMNS: '80' }, true), 28);
+});
+
 test('resolveFolderMax: 0/off/false/no disables the cap → Infinity (full folder, opt-out)', () => {
   for (const off of ['0', 'off', 'false', 'no', 'OFF']) {
     assert.equal(resolveFolderMax({ CLEPSYDRE_FOLDER_MAX: off }), Infinity);
+  }
+});
+
+test('responsiveCap: a narrow terminal (< 100 columns) keeps the tight cap', () => {
+  assert.equal(responsiveCap(80, 12, 20), 12);
+});
+
+test('responsiveCap: a wide terminal (>= 160 columns) uncaps → Infinity (full names)', () => {
+  assert.equal(responsiveCap(200, 12, 20), Infinity);
+});
+
+test('responsiveCap: a medium terminal (100–159 columns) uses the looser medium cap', () => {
+  assert.equal(responsiveCap(120, 12, 20), 20);
+});
+
+test('responsiveCap: a non-number width falls back to the tight cap (backward-compatible)', () => {
+  for (const bad of [undefined, null, NaN, '200', 'abc']) {
+    assert.equal(responsiveCap(bad, 12, 20), 12); // only real finite numbers select a band
   }
 });
 

@@ -82,8 +82,8 @@ Reading the example line above from left to right:
 | Piece | Means |
 | --- | --- |
 | `[Opus 4.8 1M·H]` | The **model** currently answering you. `1M` is the **context window it exposes** (`1M`, `200k`, …) — the real size Claude Code reports for the model, compacted to a short badge; *on by default, opt-out* via `CLEPSYDRE_MODEL_MAX` (see [model window size](#model-window-size-on-by-default-opt-out)). Never guessed, never a hardcoded table. `·H` is the **reasoning effort** compacted to a single glyph after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)); tracks live `/effort` changes. The bracket drops whatever doesn't apply (`[Opus 4.8]` when there's neither). |
-| `📁 my-project` | The **folder** (project) you're working in. Capped at 12 chars by default (25 with no git branch) (middle ellipsis); tune or disable with `CLEPSYDRE_FOLDER_MAX` (see [bounding a long folder name](#bounding-a-long-folder-name-on-by-default)). |
-| `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Capped at 12 chars by default (middle ellipsis); tune or disable with `CLEPSYDRE_BRANCH_MAX` (see [bounding a long branch name](#bounding-a-long-branch-name-on-by-default)). Outside a repo, this whole part just disappears. |
+| `📁 my-project` | The **folder** (project) you're working in. Capped at 12 chars on a narrow terminal by default (25 with no git branch), widening on wider terminals (middle ellipsis); tune or disable with `CLEPSYDRE_FOLDER_MAX` (see [bounding a long folder name](#bounding-a-long-folder-name-on-by-default)). |
+| `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Capped at 12 chars on a narrow terminal by default, widening on wider terminals (middle ellipsis); tune or disable with `CLEPSYDRE_BRANCH_MAX` (see [bounding a long branch name](#bounding-a-long-branch-name-on-by-default)). Outside a repo, this whole part just disappears. |
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
@@ -282,8 +282,9 @@ the line falls back to the plain branch and the rest of the status line is never
 
 A long branch name sits *left* of the token gauge, so on a narrow terminal it would push the
 gauge — Clepsydre's crown jewel — rightward and off-screen. To stop that, the branch is **capped
-at 12 characters by default**. Normal names (`main`, `feature/foo`) show in full; only a genuinely
-long one is shortened:
+at 12 characters on a narrow terminal by default** — and the cap **widens automatically on a wider
+terminal** (see [responsive to your terminal width](#responsive-to-your-terminal-width-on-by-default)
+below). Normal names (`main`, `feature/foo`) show in full; only a genuinely long one is shortened:
 
 ```
 # a 36-char branch, default cap
@@ -317,8 +318,9 @@ The `📁` folder name sits *left* of the token gauge too, so a long project nam
 `second-brain-generator`) pushes the gauge the same way a long branch does. Its default cap is
 **conditional on whether a git branch is also shown**: **12 characters with a branch** (it then
 shares the space left of the gauge with the branch, so both stay tight), **25 without** (a non-git
-working dir — the folder owns that whole space alone, so it can breathe). Normal names (`clepsydre`,
-`my-project`) show in full; only a long one is shortened:
+working dir — the folder owns that whole space alone, so it can breathe). These caps too **widen
+automatically on a wider terminal** (see [responsive to your terminal width](#responsive-to-your-terminal-width-on-by-default)
+below). Normal names (`clepsydre`, `my-project`) show in full; only a long one is shortened:
 
 ```
 # a 22-char folder, inside a git repo (branch shown) → 12-char cap
@@ -342,6 +344,29 @@ working dir — the folder owns that whole space alone, so it can breathe). Norm
 
 > Same rationale as the branch cap — a secondary, variable-length segment must never evict the
 > token gauge to its left ([ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md)).
+
+## Responsive to your terminal width (on by default)
+
+The folder and branch caps above are **tight on purpose only when your terminal is narrow** — where
+space is scarce and the gauge really is at risk. On a **wider** terminal there is room to spare, so
+Clepsydre **widens the caps automatically** and stops truncating for nothing: `second…rator` becomes
+`second-brain-generator` once it fits. Three width bands (read from the terminal's `COLUMNS`):
+
+| Terminal width (`COLUMNS`) | branch | folder (with branch) | folder (no branch) |
+| --- | --- | --- | --- |
+| narrow (`< 100`) | 12 | 12 | 25 |
+| medium (`100–159`) | 20 | 20 | 40 |
+| wide (`≥ 160`) | full name | full name | full name |
+
+- **Zero regression, zero config.** If the width is unknown (`COLUMNS` absent or unreadable), you get
+  exactly today's tight caps — the narrow row. Nothing to set up.
+- **Expansion only.** Widening the caps can never cost the token gauge or memory their place: the
+  band caps are sized so the gauge stays on screen even at the narrow end of each band
+  ([ADR 0006](maintainers/docs/adr/0006-responsive-width-caps.md)).
+- **Your explicit caps still win.** A `CLEPSYDRE_BRANCH_MAX` / `CLEPSYDRE_FOLDER_MAX` you set (including
+  `0` to disable) overrides the responsive default — set one and width no longer changes that segment.
+- **Adapts on the next render, not live.** Resize the terminal and the new width is picked up on the
+  **next** status-line render (each turn), not mid-drag.
 
 ## Model window size (on by default, opt-out)
 

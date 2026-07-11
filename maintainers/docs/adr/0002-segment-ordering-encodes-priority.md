@@ -99,3 +99,6 @@ Adopt an **ordering invariant: a segment's left-to-right position encodes its pr
   choice, made to honour the single-glyph, model-anchored constraint above.
 - Related: [ADR 0001](0001-git-counts-default-on.md) (git counts default-on) established both the
   opt-out convention the new segments follow and the "credit the feature origin" precedent.
+- The folder/branch caps became **responsive to terminal width** in
+  [ADR 0006](0006-responsive-width-caps.md): they expand on a wide terminal (fewer pointless
+  ellipses) while preserving this ADR's invariant — expansion only, tier-1 is never evicted.
