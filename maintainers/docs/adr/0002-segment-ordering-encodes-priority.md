@@ -74,8 +74,11 @@ Adopt an **ordering invariant: a segment's left-to-right position encodes its pr
   taste), and the contributors' actual logic is **preserved** — @guillaumejay's stale-past-reset
   `⏳ reset` marker and @anaelChardan's null-omit behaviour both stay. Credit both as feature
   origins here and in the release notes (as ADR 0001 credited @guillaumejay).
-- **The git branch may need a width cap** in a later step so an unbounded branch name can't evict
-  tier-1 on narrow terminals — flagged here, tracked in the ongoing plan, not yet implemented.
+- **The git branch is width-capped** so an unbounded branch name can't evict tier-1 on narrow
+  terminals. _Implemented (2026-07-11):_ bounded **by default at 30 chars** with a **middle**
+  ellipsis (keeps the distinctive head `feature/…` and tail `…-name`, unlike a tail-only cut);
+  tunable via `CLEPSYDRE_BRANCH_MAX`, and `0`/`off` opts out to a full branch (fine on a wide
+  screen, where nothing is evicted anyway). Default-bounded keeps this invariant true out of the box.
 - **No truncation machinery required:** the invariant rides the terminal's own right-edge
   clipping. Simplicity preserved.
 

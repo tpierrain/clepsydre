@@ -152,6 +152,28 @@ export function gitCounts(ahead = 0, behind = 0, dirty = 0) {
   return parts.join(' ');
 }
 
+// Bound the git-branch width so this variable-length segment can never evict the
+// left-anchored tier-1 (token gauge, memory) on a narrow terminal (ADR 0002). A
+// branch within `max` shows in full; a longer one is clipped to `max` total chars
+// with an ellipsis IN THE MIDDLE — keeping both the distinctive head (`feature/…`)
+// and tail (`…-ticket-42`), which a tail-only cut would throw away. The `max-1`
+// real chars split head-heavy (the extra char goes to the front).
+export function truncateBranch(branch, max) {
+  if (branch.length <= max) return branch;
+  const keep = max - 1; // room for the real chars once the '…' takes one
+  const head = Math.ceil(keep / 2);
+  const tail = Math.floor(keep / 2);
+  return branch.slice(0, head) + '…' + (tail > 0 ? branch.slice(-tail) : '');
+}
+
+// Compact the model's display name for the [model] bracket: drop a trailing
+// parenthetical qualifier like "Opus 4.8 (1M context)" → "Opus 4.8", so the
+// left-anchored label stays short and never eats the line (ADR 0002). A name
+// without such a suffix is returned unchanged.
+export function compactModelName(name) {
+  return name.replace(/\s*\(.*\)\s*$/, '');
+}
+
 // Pure extraction of the reasoning-effort level from Claude Code's `effort` input:
 // the level string (low|medium|high|xhigh|max) or null when unavailable — the field
 // only exists when the current model supports the effort parameter, so null means
@@ -188,12 +210,29 @@ export function rateInfo(rateLimits, now) {
   return { pct: Math.trunc(w.used_percentage), resetIn };
 }
 
+// Default cap for the rendered branch width (chars, ellipsis included). Bounded BY DEFAULT so a
+// long branch — which sits left of the token gauge — can't push tier-1 off a narrow terminal
+// (ADR 0002). Generous enough that normal names (main, feature/foo) show in full; only a
+// pathological one gets a middle ellipsis.
+const DEFAULT_BRANCH_MAX = 30;
+
+// The branch-width cap, from CLEPSYDRE_BRANCH_MAX. Bounded by default (DEFAULT_BRANCH_MAX):
+//   • unset / non-numeric → the 30-char default;
+//   • a positive integer → that width;
+//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full branch, for wide screens).
+// Truncated to an integer since it drives string slicing.
+export function resolveBranchMax(env = {}) {
+  const raw = env.CLEPSYDRE_BRANCH_MAX;
+  if (!enabledUnlessOptedOut(raw)) return Infinity; // 0/off/false/no → uncapped
+  return Math.trunc(positiveOr(raw, DEFAULT_BRANCH_MAX));
+}
+
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
 // fs or git here). `git` is { branch, ahead, behind, dirty } and `mem` is
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, basename, git, used, max, mem, effort, rate, thresholds }) {
+export function buildStatusLine({ model, basename, git, used, max, mem, effort, rate, thresholds, branchMax = resolveBranchMax() }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
@@ -203,7 +242,7 @@ export function buildStatusLine({ model, basename, git, used, max, mem, effort, 
   const effortTag = effort ? `·${effortGlyph(effort)}` : '';
   let out = `[${model}${effortTag}] 📁 ${basename}`;
   if (git?.branch) {
-    out += ` ⎇ ${git.branch}`;
+    out += ` ⎇ ${truncateBranch(git.branch, branchMax)}`;
     const counts = gitCounts(git.ahead, git.behind, git.dirty);
     if (counts) out += ` ${ORANGE}${counts}${RESET}`;
   }
@@ -344,7 +383,7 @@ export function main() {
     input = {};
   }
 
-  const model = input.model?.display_name ?? '?';
+  const model = compactModelName(input.model?.display_name ?? '?');
   const dir = input.workspace?.current_dir ?? input.cwd ?? '';
   const cw = input.context_window ?? {};
   const used = (cw.total_input_tokens ?? 0) + (cw.total_output_tokens ?? 0);
@@ -369,6 +408,7 @@ export function main() {
     effort,
     rate,
     thresholds: resolveThresholds(process.env),
+    branchMax: resolveBranchMax(process.env),
   });
   process.stdout.write(line + '\n');
 }

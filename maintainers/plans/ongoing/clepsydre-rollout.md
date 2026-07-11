@@ -2,12 +2,14 @@
 
 > **The single active plan.** The git-counts feature **and** both external-contributor PRs
 > (#5 effort, #4 rate-window) are shipped and released in **v1.3.0** under
-> [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md). **Active work now** (field
-> feedback 2026-07-11): **step 13** — shorten the status line (it already clips on a normal terminal).
-> **Step 12** (show the rate window from session start) was **abandoned** — a startup bridge can only
-> be stale/misleading; see [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md).
-> Then the remaining **human-only** field checks (steps 5–6). Start at the first unchecked `- [ ]`;
-> tick boxes and note _(date · commit)_ as you go.
+> [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md). **Steps 12 & 13 done**
+> (2026-07-11): **step 12** (show the rate window from session start) was **abandoned** — a startup
+> bridge can only be stale/misleading, see
+> [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md); **step 13** shortened
+> the line (model label compacted, git branch bounded-by-default at 30, opt-out via
+> `CLEPSYDRE_BRANCH_MAX=0`). **Next:** cut a release crediting @anaelChardan & @guillaumejay, then the
+> remaining **human-only** field checks (steps 5–6). Start at the first unchecked `- [ ]`; tick boxes
+> and note _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
 ## Shipped (git-counts feature — done)
@@ -100,16 +102,30 @@ placement/rendering only — driven by the documented rule, not taste.
   - [x] **Document** — README rate-window section already states the omit-until-fresh behaviour;
         ADR 0004 captures the rationale. _(2026-07-11)_
 
-- [ ] **13. Shorten the status line — it's already at the clip edge on a normal terminal.**
+- [x] **13. Shorten the status line — it's already at the clip edge on a normal terminal.**
+      _(2026-07-11 · model label compacted + branch bounded-by-default; suite green at 103)_
       Tier-1 (tokens, memory) is structurally safe by ADR 0002, but the secondary segments crowd the
       line; a longer branch name than `main` would push the rate window fully off-screen.
-  - [ ] **Compact the model label** — strip parenthetical suffixes like `(1M context)` from the
+  - [x] **Compact the model label** — strip parenthetical suffixes like `(1M context)` from the
         display name so `[Opus 4.8 (1M context)·H]` → `[Opus 4.8·H]`. Biggest easy win. TDD.
-  - [ ] **Bound the git-branch width** (was step 11) — truncate a long branch (e.g. `feature/very…`)
-        so it can't evict tier-1 on narrow terminals (ADR 0002 "Consequences"). TDD.
-  - [ ] **Evaluate compacting the memory segment** — e.g. trim redundant labels in
-        `🧩 MEMORY.md 157B · mem 157B/1f`; don't over-trim, keep it readable.
-  - [ ] **Re-measure** the rendered width on an 80-column terminal after each change; note the win.
+        _(2026-07-11 · new pure helper `compactModelName` + wired in `main`; 13 chars saved on the
+        field example; README note; suite green at 94)_
+  - [x] **Bound the git-branch width** (was step 11) — cap a long branch so it can't evict tier-1 on
+        narrow terminals (ADR 0002 "Consequences"). TDD. **Refined with Thomas:** ellipsis **in the
+        middle** (keeps head `feature/…` + tail `…-name`, not a tail-only cut); **bounded by default at
+        30** (protects the gauge on narrow terminals — the users who are actually impacted), with
+        `CLEPSYDRE_BRANCH_MAX=<n>` to tune and `0`/`off` to **opt out** to a full branch (wide screens).
+        _(2026-07-11 · pure helpers `truncateBranch` (middle ellipsis) + `resolveBranchMax` (default 30,
+        opt-out via 0/off); `branchMax` threaded through `buildStatusLine` and `main`; README section;
+        suite green at 103)_ **ADR 0002 reconciled:** default-bounded keeps the "variable-length must be
+        bounded" invariant true out of the box — updated the ADR 0002 consequence to "implemented".
+  - [x] **Evaluate compacting the memory segment** — **decision: leave as is.** It's tier-1 (never
+        clipped), and `MEMORY.md <size>` vs `mem <total>/<n>f` carry two distinct signals as soon as
+        there's >1 file; the only redundancy is the trivial single-file case. Trimming risks
+        readability for ~zero column win where it matters. _(2026-07-11)_
+  - [x] **Re-measure** the rendered width on an 80-column terminal after each change; note the win.
+        _(2026-07-11 · field example `inqom-brain`: 117 → 104 code points, **−13 cols** from the model
+        label alone; branch cap is defensive/opt-in so it doesn't shrink the `main` example)_
 
 ## Remaining — human-only field checks (no code)
 

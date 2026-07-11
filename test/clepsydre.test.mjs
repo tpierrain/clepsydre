@@ -9,7 +9,8 @@ import {
   fmtTokens, fmtBytes, tokenTier, memTier, resolveMax, pct, buildStatusLine,
   computeMemDir, readMemory, resolveThresholds, gitCounts, parseGitStatus,
   resolveGitCounts, gitInfo, resolveEffort, effortInfo, effortGlyph,
-  fmtCountdown, rateTier, resolveRateWindow, rateInfo,
+  fmtCountdown, rateTier, resolveRateWindow, rateInfo, compactModelName,
+  truncateBranch, resolveBranchMax,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -281,6 +282,37 @@ test('effortGlyph: each level compacts to its single-glyph form (ADR 0002 table)
   assert.equal(effortGlyph('max'), 'MAX');
 });
 
+test('compactModelName: a parenthetical suffix is stripped ("Opus 4.8 (1M context)" → "Opus 4.8")', () => {
+  assert.equal(compactModelName('Opus 4.8 (1M context)'), 'Opus 4.8');
+});
+
+test('compactModelName: a name with no parenthetical passes through unchanged', () => {
+  assert.equal(compactModelName('Sonnet 4.6'), 'Sonnet 4.6');
+});
+
+test('truncateBranch: a branch wider than max keeps its head AND tail, ellipsis in the middle', () => {
+  // head + '…' + tail, total = max: the distinctive prefix (feature/…) and suffix (…-here) both survive.
+  assert.equal(truncateBranch('feature/very-long-name-here', 12), 'featur…-here');
+});
+
+test('truncateBranch: a branch within max passes through unchanged, no ellipsis', () => {
+  assert.equal(truncateBranch('main', 12), 'main');
+});
+
+test('resolveBranchMax: no env var falls back to the default 30-char cap (bounded by default)', () => {
+  assert.equal(resolveBranchMax({}), 30);
+});
+
+test('resolveBranchMax: a valid positive override wins over the default', () => {
+  assert.equal(resolveBranchMax({ CLEPSYDRE_BRANCH_MAX: '40' }), 40);
+});
+
+test('resolveBranchMax: 0/off/false/no disables the cap → Infinity (full branch, opt-out)', () => {
+  for (const off of ['0', 'off', 'false', 'no', 'OFF']) {
+    assert.equal(resolveBranchMax({ CLEPSYDRE_BRANCH_MAX: off }), Infinity);
+  }
+});
+
 test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only, never lose the branch', () => {
   const run = (dir, args) => {
     if (args[0] === 'status') throw new Error('porcelain unsupported / git hiccup');
@@ -374,6 +406,22 @@ test('buildStatusLine: a git branch adds a ⎇ segment before the gauge', () => 
     used: 65300, max: 230000, mem: null,
   });
   assert.equal(line, `[Opus 4.8] 📁 my-project ⎇ main · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`);
+});
+
+test('buildStatusLine: with no branchMax a long branch is clipped at the 30-char default (bounded by default)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'my-project', git: { branch: 'feature/some-really-long-branch-name' },
+    used: 65300, max: 230000, mem: null,
+  });
+  assert.match(line, /⎇ feature\/some-re…ng-branch-name ·/); // 30 total chars, head+tail, ellipsis middle
+});
+
+test('buildStatusLine: an explicit branchMax overrides the default cap', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'my-project', git: { branch: 'feature/some-really-long-branch-name' },
+    used: 65300, max: 230000, mem: null, branchMax: 12,
+  });
+  assert.match(line, /⎇ featur…-name ·/); // clipped to 12 total chars at the caller's cap
 });
 
 test('parseGitStatus: branch, ahead/behind and dirty from porcelain-v2 output', () => {
@@ -573,6 +621,42 @@ test('end-to-end: inside a git repo the branch shows in the ⎇ segment', () => 
   assert.match(out, /📁 [^⎇]+⎇ feature-x ·/);
 });
 
+test('end-to-end: CLEPSYDRE_BRANCH_MAX clips a long branch (middle ellipsis); unset would show it full', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  execFileSync('git', ['-C', work, 'init', '-b', 'feature/some-really-long-branch-name'], { stdio: 'ignore' });
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_BRANCH_MAX: '24' },
+  });
+  assert.match(out, /⎇ feature\/some…branch-name ·/); // opted into a 24-char cap, head+tail kept
+});
+
+test('end-to-end: with no CLEPSYDRE_BRANCH_MAX a long branch is clipped at the 30-char default', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  execFileSync('git', ['-C', work, 'init', '-b', 'feature/some-really-long-branch-name'], { stdio: 'ignore' });
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_BRANCH_MAX: '' }, // '' → default 30
+  });
+  assert.match(out, /⎇ feature\/some-re…ng-branch-name ·/); // bounded by default, no env needed
+});
+
 test('end-to-end: git-counts opted OUT (=0) → branch only, no ↑↓± suffix even when dirty', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
@@ -709,6 +793,23 @@ test('end-to-end: effort in the payload → the glyph is glued inside the [model
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
   });
   assert.match(out, /^\[TestModel·H\] /); // effort compacted to a glyph, anchored to the model
+});
+
+test('end-to-end: a parenthetical model qualifier is stripped in the [model] bracket', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'Opus 4.8 (1M context)' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
+  });
+  assert.match(out, /^\[Opus 4\.8\] /); // "(1M context)" dropped so the label stays short (ADR 0002)
 });
 
 test('end-to-end: effort opted OUT (=0) → the [model] bracket stays bare even with effort present', () => {

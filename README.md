@@ -71,9 +71,9 @@ Reading the example line above from left to right:
 
 | Piece | Means |
 | --- | --- |
-| `[Opus 4.8·H]` | The **model** currently answering you, with its **reasoning effort** compacted to a single glyph right after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here `·H` = *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)). Tracks live `/effort` changes; the bracket stays bare (`[Opus 4.8]`) when the model has no effort setting. |
+| `[Opus 4.8·H]` | The **model** currently answering you, with its **reasoning effort** compacted to a single glyph right after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here `·H` = *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)). Tracks live `/effort` changes; the bracket stays bare (`[Opus 4.8]`) when the model has no effort setting. A trailing parenthetical qualifier is dropped (`Opus 4.8 (1M context)` → `Opus 4.8`) to keep the label short. |
 | `📁 my-project` | The **folder** (project) you're working in. |
-| `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Outside a repo, this whole part just disappears. |
+| `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Capped at 30 chars by default (middle ellipsis); tune or disable with `CLEPSYDRE_BRANCH_MAX` (see [bounding a long branch name](#bounding-a-long-branch-name-on-by-default)). Outside a repo, this whole part just disappears. |
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
@@ -267,6 +267,39 @@ counts are worth having on by default (full numbers and rationale in
 On a genuinely huge monorepo where that per-render cost bites, opt out with `=0` and the branch
 still shows via a cheap ref read. Either way it's robust: if git ever fails with the counts on,
 the line falls back to the plain branch and the rest of the status line is never affected.
+
+## Bounding a long branch name (on by default)
+
+A long branch name sits *left* of the token gauge, so on a narrow terminal it would push the
+gauge — Clepsydre's crown jewel — rightward and off-screen. To stop that, the branch is **capped
+at 30 characters by default**. Normal names (`main`, `feature/foo`) show in full; only a genuinely
+long one is shortened:
+
+```
+# a 36-char branch, default cap
+[Opus 4.8] 📁 my-project ⎇ feature/some-re…ng-branch-name · 🧠 65.3k/230.0k (28%) · …
+```
+
+- The cap is a **total character count**, ellipsis included. A branch within it shows unchanged; a
+  longer one is clipped with an ellipsis **in the middle**, keeping both the distinctive **head**
+  (`feature/…`) and **tail** (`…-name`) — the parts a tail-only cut would throw away.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_BRANCH_MAX` | `30` | A positive integer sets the cap (total chars, middle ellipsis). `0` (or `false`/`no`/`off`) disables it → the branch shows **in full** (handy on a wide screen). |
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_BRANCH_MAX": "0"
+  }
+}
+```
+
+> Why bounded by default? The token gauge is the whole point of Clepsydre, and it must never be
+> evicted by a secondary segment growing to its left. See
+> [ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md) for how segment
+> ordering encodes this priority.
 
 ## Reasoning effort (on by default, opt-out)
 
