@@ -2,10 +2,11 @@
 
 > **The single active plan.** The git-counts feature **and** both external-contributor PRs
 > (#5 effort, #4 rate-window) are shipped and released in **v1.3.0** under
-> [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md). Only two things remain, both
-> outside code: **manual field validation** on real Mac/Windows machines (step 5–6, human-only), and
-> an **optional** git-branch width cap (step 11, deferred). Start at the first unchecked `- [ ]`;
-> tick boxes and note _(date · commit)_ as you go.
+> [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md). **Active work now** (field
+> feedback 2026-07-11): **step 12** — show the rate window from session start — and **step 13** —
+> shorten the status line (it already clips on a normal terminal). Then the remaining **human-only**
+> field checks (steps 5–6). Start at the first unchecked `- [ ]`; tick boxes and note
+> _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
 ## Shipped (git-counts feature — done)
@@ -69,8 +70,40 @@ placement/rendering only — driven by the documented rule, not taste.
       That…"), crediting **@anaelChardan** and **@guillaumejay** in the notes.
       _(2026-07-11 · **v1.3.0 — "The One That Shows Your Effort (and Your Limits)"**, tag on `55f0cb2`)_
 
-- [ ] **11. (Optional) Bound the git branch width** — so a long branch name can't evict tier-1 on
-      narrow terminals (ADR 0002 "Consequences"); TDD. Defer unless it bites in the field.
+## Next up — field-feedback follow-ups (2026-07-11)
+
+> From Thomas's real session (`inqom-brain`) on v1.3.0. The line rendered
+> `[Opus 4.8 (1M context)·H] 📁 inqom-brain ⎇ main · 🧠 50.7k/500.0k (10%) · 🧩 MEMORY.md 157B · mem 157B/1f · ⌛ 11…`
+> — the rate window is **already clipped** (`⌛ 11…`) and only a short branch name kept it partly
+> visible. Two asks: **(a)** show the rate window from session start, and **(b)** shorten the line.
+> Resume here after `/clear`. Strict TDD, suite green before each commit.
+
+- [ ] **12. Rate window must show from session start, not only after the first turn.**
+      Governed by [ADR 0003](../../docs/adr/0003-information-shows-from-first-render.md) (info shows
+      from the first render unless structurally N/A). Cause: Claude Code only puts `rate_limits` in
+      the status-line JSON **after the first API response**, so `rateInfo` returns null at startup
+      and the ⏳ segment is absent until the first instruction. Thomas wants it visible immediately —
+      this is ADR-0003 case 2 (**applicable but not yet arrived** → bridge), not case 1 (no Pro/Max
+      → omit).
+  - [ ] **Confirm the cause** — inspect/log the raw stdin JSON on the very first render of a fresh
+        session: is `rate_limits` genuinely absent, or present in a different shape?
+  - [ ] **Design the fix** — likely **persist the last-seen rate window** to a small cache file
+        (e.g. under the project's memory dir) and render from cache at startup; the existing
+        stale-past-reset guard already nulls it to `⏳ reset` if the window rolled over while idle.
+        Weigh alternatives (any other Claude Code source) on cost/robustness before coding.
+  - [ ] **Implement in strict TDD** — pure cache read/write + `rateInfo` startup fallback; suite green.
+  - [ ] **Document** the new startup behaviour in the README rate-window section.
+
+- [ ] **13. Shorten the status line — it's already at the clip edge on a normal terminal.**
+      Tier-1 (tokens, memory) is structurally safe by ADR 0002, but the secondary segments crowd the
+      line; a longer branch name than `main` would push the rate window fully off-screen.
+  - [ ] **Compact the model label** — strip parenthetical suffixes like `(1M context)` from the
+        display name so `[Opus 4.8 (1M context)·H]` → `[Opus 4.8·H]`. Biggest easy win. TDD.
+  - [ ] **Bound the git-branch width** (was step 11) — truncate a long branch (e.g. `feature/very…`)
+        so it can't evict tier-1 on narrow terminals (ADR 0002 "Consequences"). TDD.
+  - [ ] **Evaluate compacting the memory segment** — e.g. trim redundant labels in
+        `🧩 MEMORY.md 157B · mem 157B/1f`; don't over-trim, keep it readable.
+  - [ ] **Re-measure** the rendered width on an 80-column terminal after each change; note the win.
 
 ## Remaining — human-only field checks (no code)
 

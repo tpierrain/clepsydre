@@ -14,6 +14,13 @@
   left-anchored exception (glued to `[model]`, single glyph). Apply it when reviewing any PR that
   adds a segment. See [ADR 0002](docs/adr/0002-segment-ordering-encodes-priority.md).
 
+- **Information shows from the first render — unless it's structurally not applicable.** A segment
+  must be present from session start, never popping in only after the first turn. The sole exception
+  is when the thing genuinely doesn't exist here (no Pro/Max subscription → no rate window, outside a
+  git repo → no branch, model without an effort field → no glyph): omit, never fabricate. When data
+  *applies* but Claude Code sends it late, **bridge** the gap (e.g. render a cached last-seen value)
+  rather than show nothing. See [ADR 0003](docs/adr/0003-information-shows-from-first-render.md).
+
 ## Plans & resuming work
 
 Plans live under **`maintainers/plans/`**, split three ways:
