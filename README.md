@@ -12,7 +12,7 @@
 lives in your status line and shows — every turn, without you asking — how full your
 context is, so you can `/clear` at exactly the right moment.
 
-![Clepsydre status line, red tier: 244.6k/400.0k (61%)](assets/statusline-red.png)
+![Clepsydre status line, warning tier: [Opus 4.8 1M·H] folder second…rator, branch test/r…ening ±6, 183.8k/300.0k (61%) with the ⚠️ ease-off icon, MEMORY.md 9.1K, mem 140.0K/40f, rate window 39% resets in 1h22](assets/statusline-warn.png)
 
 > **Why "Clepsydre"?** A *clepsydra* is a water clock. In *Fort Boyard*, it slowly fills
 > the room until the door locks and you're trapped — *"Sors ! Sors ! Sors !"*. Your
@@ -44,7 +44,7 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 
 Here it is live, with every segment on screen:
 
-![Clepsydre status line, all segments: [Opus 4.8·H] folder clepsydre, branch main, 40.6k/300.0k (13%) green, MEMORY.md 0B, mem 0B/0f, rate window 8% resets in 4h05](assets/statusline-overview.png)
+![Clepsydre status line, all segments: [Opus 4.8 1M·H] folder second…rator, branch test/r…ening ±6, 126.0k/300.0k (42%) green, MEMORY.md 9.1K, mem 140.0K/40f, rate window 39% resets in 1h23](assets/statusline-overview.png)
 
 - **Model · window size · reasoning effort · folder · git branch** — the model bracket packs
   three things: the model name, the **context window it exposes** as a compact badge (e.g. `1M`,
@@ -64,11 +64,11 @@ Here it is live, with every segment on screen:
 
 Plenty of headroom — 🧠 green, you're fine:
 
-![Clepsydre status line, green tier: 129.6k/400.0k (32%)](assets/statusline-green.png)
+![Clepsydre status line, green tier: 119.2k/300.0k (39%)](assets/statusline-green.png)
 
 Deep in the stupidity zone — 🤪 bold red, `/clear` now:
 
-![Clepsydre status line, red tier: 244.6k/400.0k (61%)](assets/statusline-red.png)
+![Clepsydre status line, red tier: 262.3k/300.0k (87%), 🤪 stupidity zone, 2% until auto-compact](assets/statusline-red.png)
 
 
 ### How to read it, piece by piece
