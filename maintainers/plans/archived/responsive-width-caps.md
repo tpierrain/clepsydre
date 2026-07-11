@@ -1,20 +1,16 @@
-# 🏺 Clepsydre — responsive width caps (ongoing)
+# 🏺 Clepsydre — responsive width caps (SHIPPED · v1.5.0)
 
-> **Active plan.** Resume at the first unchecked `- [ ]` in **Tracking**.
+> **✅ SHIPPED 2026-07-11 as v1.5.0 — *"The One That Fits Your Terminal"*** (commit `57e5526`,
+> https://github.com/tpierrain/clepsydre/releases/tag/v1.5.0). Archived record; nothing left to do.
 > Idea origin: Thomas, 2026-07-11 — *"could we read the terminal width and adapt, so we don't
 > truncate for nothing on a wide terminal?"*
 
-> 🛑 **STATE AS OF 2026-07-11 (read before doing anything — survives `/clear`):**
-> - **Uncommitted work** in `~/Dev/clepsydre` (`git status` shows `clepsydre.mjs`, `test/…`, README, ADR
->   0006, this plan). **142 tests green.** NOT committed, NOT pushed, NOT released.
-> - **Thomas's statusLine is temporarily repointed** to `~/Dev/clepsydre/clepsydre.mjs`
->   (`~/.claude/settings.json` → `statusLine.command`) so he can field-test the dev code live. **It MUST be
->   reverted to `~/clepsydre/clepsydre.mjs` before any commit/release** (step 8f).
-> - **DONE: step 8i.D — name-collapse to icons** (`shouldCollapseNames` + `buildStatusLine` wiring, ADR 0006
->   + README updated). Degradation ladder complete: full → shrink → `📁 ⎇ ±N` → clip.
-> - **NEXT ACTION = re-field-test on Mac with the collapse** (very narrow terminal shows `📁 ⎇ ±6`, not
->   `se…or`), then **step 8f**: revert the statusLine repoint → commit → push → `gh release create v1.5.0`
->   ("The One That Fits Your Terminal"). Pre-flight: English-only artifacts; suite green.
+> 🏁 **FINAL STATE (2026-07-11):** Feature complete and released. Responsive folder/branch names sized
+> from `COLUMNS`, everything-else-always-visible contract, degradation ladder full → shrink (folder
+> first) → collapse to icons (`📁 ⎇ ±N`) → terminal clips the rate last. Width reserve for
+> padding/ellipsis. 142 tests green. ADR 0006 (design) + ADR 0002 (invariant preserved, superseded
+> note) + README updated. Statusline repoint reverted to `~/clepsydre/clepsydre.mjs`. The only residual
+> degradation is the by-design rate clip below ~99 cols (gauge + memory always safe).
 
 ## Tracking
 
@@ -35,9 +31,10 @@
 - [ ] **6. README + release** — MINOR bump, *"The One That…"*.
   - [x] Rewrite the "Responsive to your terminal width" section (bands table → budget explanation) _(2026-07-11)_.
   - [x] Commit the pivot _(2026-07-11 · 9e32f06)_.
-  - [ ] Bump version + publish the release. **Decided (2026-07-11):** version **v1.5.0** (MINOR — new
-        user-facing feature), title **"The One That Fits Your Terminal"**. **Field-test FIRST** (step 7),
-        then `gh release create v1.5.0`.
+  - [x] Bump version + publish the release. **SHIPPED (2026-07-11 · 57e5526):** **v1.5.0** — *"The One
+        That Fits Your Terminal"* (MINOR). Field-tested first, then `gh release create v1.5.0`
+        (https://github.com/tpierrain/clepsydre/releases/tag/v1.5.0). Version lives in git tags only
+        (package.json stays 1.0.0, untracked — as for all prior releases).
 - [x] **7. Field checks (Mac)** — done 2026-07-11 via a temporary statusLine repoint to the dev checkout
       (`~/.claude/settings.json` → `~/Dev/clepsydre/clepsydre.mjs`, to test the real code without shipping).
       Live render confirms full names on wide terminals **and** revealed a design gap → step 8 below.
@@ -89,8 +86,10 @@
           `📁 ⎇ ±N` (or `📁` outside a repo) below the wall. 4 tests (2 unit + 2 integration incl. no-branch),
           142 green. Smoke-tested 80→200 cols: full → shrink → collapse (`📁 ⎇ ±6`, w=100 at ≤~110) → clip.
           ADR 0006 + README updated with the collapse rung of the degradation ladder.
-  - [ ] **8f. Revert the statusLine repoint** (`~/.claude/settings.json` → `~/clepsydre/clepsydre.mjs`),
-        commit, then push + `gh release create v1.5.0`. **← the repoint revert is mandatory and easy to forget.**
+  - [x] **8f. Revert the statusLine repoint** (`~/.claude/settings.json` → `~/clepsydre/clepsydre.mjs`),
+        commit, push + `gh release create v1.5.0`. _(2026-07-11 · 57e5526)_ Repoint reverted, committed,
+        pushed to `main`, release published. Field-test (Mac, all font sizes / window widths) confirmed the
+        full ladder incl. collapse; the only degradation left is the by-design rate clip at ~99 cols.
 
 ### Design (step 8, current) — everything always visible; names are the sole flex variable
 

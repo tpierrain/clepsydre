@@ -12,9 +12,12 @@
 ## Context
 
 Clepsydre emits the status line as a **single string**, and it is the **terminal that clips it at
-the right edge** when the window is too narrow. There is no width-aware truncation code, and we
-don't want any: **left-to-right position already IS the degradation order** — whatever sits
-furthest right disappears first. Ordering therefore *is* the priority mechanism, for free.
+the right edge** when the window is too narrow. In this original design there was no width-aware
+truncation code, and back then we didn't want any: **left-to-right position already IS the
+degradation order** — whatever sits furthest right disappears first. Ordering therefore *is* the
+priority mechanism, for free. _(Later, [ADR 0006](0006-responsive-width-caps.md) did add width-aware
+**sizing** — but only to widen the names when there's room; this ordering-is-priority invariant is
+untouched, and right-edge clipping remains the ultimate backstop.)_
 
 Clepsydre is, by its own pitch, **a context-window status line**. Its reason to exist is the
 **token gauge** (`used/max (pct%)`); the **memory** segment (`MEMORY.md` + `mem`) is the second
