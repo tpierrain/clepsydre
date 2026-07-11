@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   fmtTokens, fmtBytes, tokenTier, memTier, resolveMax, pct, buildStatusLine,
   computeMemDir, readMemory, resolveThresholds, gitCounts, parseGitStatus,
-  resolveGitCounts, gitInfo, resolveEffort, effortInfo,
+  resolveGitCounts, gitInfo, resolveEffort, effortInfo, effortGlyph,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -192,6 +192,14 @@ test('effortInfo: absent field / empty / non-string → null (segment omitted, n
   assert.equal(effortInfo({ level: 3 }), null);
 });
 
+test('effortGlyph: each level compacts to its single-glyph form (ADR 0002 table)', () => {
+  assert.equal(effortGlyph('low'), 'L');
+  assert.equal(effortGlyph('medium'), 'M');
+  assert.equal(effortGlyph('high'), 'H');
+  assert.equal(effortGlyph('xhigh'), 'xH');
+  assert.equal(effortGlyph('max'), 'MAX');
+});
+
 test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only, never lose the branch', () => {
   const run = (dir, args) => {
     if (args[0] === 'status') throw new Error('porcelain unsupported / git hiccup');
@@ -312,18 +320,25 @@ test('buildStatusLine: no branch means the git-counts suffix is never shown', ()
   assert.equal(line, `[Opus 4.8] 📁 p · ${GREEN}🧠 1.0k/230.0k (0%)${RESET}`);
 });
 
-test('buildStatusLine: an effort level adds a 💪 segment between the branch and the gauge', () => {
+test('buildStatusLine: an effort level is compacted to a glyph glued to the [model] bracket', () => {
   const line = buildStatusLine({
     model: 'Opus 4.8', basename: 'my-project', git: { branch: 'main' },
     used: 65300, max: 230000, mem: null, effort: 'high',
   });
   assert.equal(
     line,
-    `[Opus 4.8] 📁 my-project ⎇ main · 💪 high · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`,
+    `[Opus 4.8·H] 📁 my-project ⎇ main · ${GREEN}🧠 65.3k/230.0k (28%)${RESET}`,
   );
 });
 
-test('buildStatusLine: a null effort omits the 💪 segment entirely', () => {
+test('buildStatusLine: xhigh/max compact to their multi-char glyphs inside the bracket', () => {
+  const at = (effort) =>
+    buildStatusLine({ model: 'Opus 4.8', basename: 'p', used: 1000, max: 230000, mem: null, effort });
+  assert.match(at('xhigh'), /^\[Opus 4\.8·xH\] /);
+  assert.match(at('max'), /^\[Opus 4\.8·MAX\] /);
+});
+
+test('buildStatusLine: a null effort leaves the [model] bracket bare (segment omitted)', () => {
   const line = buildStatusLine({
     model: 'Opus 4.8', basename: 'p', used: 1000, max: 230000, mem: null, effort: null,
   });
@@ -527,7 +542,7 @@ test('end-to-end: piping Claude Code JSON prints the composed status line', () =
   );
 });
 
-test('end-to-end: effort in the payload → the 💪 segment shows before the token gauge', () => {
+test('end-to-end: effort in the payload → the glyph is glued inside the [model] bracket', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
@@ -542,10 +557,10 @@ test('end-to-end: effort in the payload → the 💪 segment shows before the to
     encoding: 'utf8',
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
   });
-  assert.match(out, /· 💪 high · \x1B\[32m🧠/); // 💪 high sits just before the token gauge
+  assert.match(out, /^\[TestModel·H\] /); // effort compacted to a glyph, anchored to the model
 });
 
-test('end-to-end: effort opted OUT (=0) → no 💪 segment even with effort present', () => {
+test('end-to-end: effort opted OUT (=0) → the [model] bracket stays bare even with effort present', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-work-'));
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
@@ -560,5 +575,5 @@ test('end-to-end: effort opted OUT (=0) → no 💪 segment even with effort pre
     encoding: 'utf8',
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_EFFORT: '0' },
   });
-  assert.doesNotMatch(out, /💪/);
+  assert.match(out, /^\[TestModel\] /); // bare bracket — no ·MAX
 });

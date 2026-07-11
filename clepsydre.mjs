@@ -98,6 +98,10 @@ export function resolveGitCounts(env = {}) {
   return !GIT_COUNTS_OFF.has(String(env.CLEPSYDRE_GIT_COUNTS ?? '').trim().toLowerCase());
 }
 
+// Reasoning-effort segment — feature origin: @anaelChardan (PR #5). The contributor's opt-out
+// flag and null-omit logic are preserved verbatim; the maintainer only re-anchored the rendering
+// into the [model] bracket per ADR 0002.
+//
 // Resolve the reasoning-effort flag from the environment. ON by default: the effort
 // segment shows unless explicitly opted OUT with a falsy value (0/false/no/off, any case),
 // mirroring resolveGitCounts. Read from process.env so it can be turned off globally
@@ -135,6 +139,14 @@ export function effortInfo(effort) {
   return typeof level === 'string' && level.trim() !== '' ? level.trim() : null;
 }
 
+// Compact a verbatim effort level to its single-glyph form, per the ADR 0002 table, so it
+// can sit glued to the [model] bracket and never grow the line. An unknown level falls
+// through to its own upper-cased form (forward-compatible: a future level still renders).
+const EFFORT_GLYPHS = { low: 'L', medium: 'M', high: 'H', xhigh: 'xH', max: 'MAX' };
+export function effortGlyph(level) {
+  return EFFORT_GLYPHS[level] ?? String(level).toUpperCase();
+}
+
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
 // fs or git here). `git` is { branch, ahead, behind, dirty } and `mem` is
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
@@ -144,15 +156,16 @@ export function buildStatusLine({ model, basename, git, used, max, mem, effort, 
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
-  let out = `[${model}] 📁 ${basename}`;
+  // Reasoning effort is anchored to the model label (ADR 0002): compacted to a single glyph
+  // and glued inside the [model] bracket with a middot — so it stays left-most and can never
+  // grow the line or evict the token gauge. A null effort leaves the bracket bare.
+  const effortTag = effort ? `·${effortGlyph(effort)}` : '';
+  let out = `[${model}${effortTag}] 📁 ${basename}`;
   if (git?.branch) {
     out += ` ⎇ ${git.branch}`;
     const counts = gitCounts(git.ahead, git.behind, git.dirty);
     if (counts) out += ` ${ORANGE}${counts}${RESET}`;
   }
-  // Reasoning-effort level (💪) — informational, uncoloured (not a threshold gauge like
-  // the token/mem segments). A null effort (model without the effort parameter) omits it.
-  if (effort) out += ` · 💪 ${effort}`;
   out += ` · ${tok}`;
   if (mem) {
     const m = memTier(mem.mdBytes, t.mem);

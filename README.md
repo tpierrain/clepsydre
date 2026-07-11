@@ -39,12 +39,13 @@ after turn, but nothing keeps it in view — and **you can't steer what you can'
 ## What you see
 
 ```
-[Opus 4.8] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 💪 high · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
+[Opus 4.8·H] 📁 my-project ⎇ main ↑2 ↓1 ±8 · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
 ```
 
-- **Model · folder · git branch**
-- **Reasoning effort** — the model's current effort level (`💪 low`/`medium`/`high`/`xhigh`/`max`),
-  reflecting live `/effort` changes. Absent when the model has no effort setting.
+- **Model · reasoning effort · folder · git branch** — the effort level rides *inside* the model
+  bracket as a single glyph (`·L`/`·M`/`·H`/`·xH`/`·MAX`), so `[Opus 4.8·H]` = Opus 4.8 thinking at
+  **high**. It tracks live `/effort` changes, and the bracket stays bare when the model has no
+  effort setting.
 - **Live token usage** vs your working window, colored by the anti-context-rot threshold:
   - 🧠 green — you're fine
   - ⚠️ orange — ≥ 150k, ease off
@@ -67,12 +68,11 @@ Reading the example line above from left to right:
 
 | Piece | Means |
 | --- | --- |
-| `[Opus 4.8]` | The **model** currently answering you. |
+| `[Opus 4.8·H]` | The **model** currently answering you, with its **reasoning effort** compacted to a single glyph right after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here `·H` = *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)). Tracks live `/effort` changes; the bracket stays bare (`[Opus 4.8]`) when the model has no effort setting. |
 | `📁 my-project` | The **folder** (project) you're working in. |
 | `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Outside a repo, this whole part just disappears. |
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
-| `💪 high` | The model's current **reasoning effort** (`low`/`medium`/`high`/`xhigh`/`max`) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)). Tracks live `/effort` changes. Disappears when the current model has no effort setting. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
 | `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
 | `mem 18.0K/12f` | The **whole memory folder**: `18.0K` total across every memory file, `12f` = **12 files**. Reads on demand, so it doesn't cost context the way `MEMORY.md` does — this is just its footprint on disk. |
@@ -264,20 +264,36 @@ the line falls back to the plain branch and the rest of the status line is never
 
 ## Reasoning effort (on by default, opt-out)
 
-A `💪` segment shows the model's current reasoning-effort level, out of the box:
+The model's current reasoning-effort level rides **inside the `[model]` bracket**, compacted to a
+single glyph after a middot, out of the box:
 
 ```
-[Opus 4.8] 📁 my-project ⎇ main · 💪 high · 🧠 65.3k/230.0k (28%) · …
+[Opus 4.8·H] 📁 my-project ⎇ main · 🧠 65.3k/230.0k (28%) · …
 ```
 
-- The level is one of `low`/`medium`/`high`/`xhigh`/`max`, read straight from Claude Code's
-  session data — it reflects live `/effort` changes with no extra work or API calls.
-- The segment **disappears** when the current model has no effort setting (the field is simply
-  absent), so it's never a fabricated or stale value.
+- The level is read straight from Claude Code's session data — it reflects live `/effort` changes
+  with no extra work or API calls — and is compacted to one glyph so it stays anchored to the model
+  and can never push the token gauge off a narrow terminal:
+
+  | Level | Glyph |
+  | --- | --- |
+  | `low` | `·L` |
+  | `medium` | `·M` |
+  | `high` | `·H` |
+  | `xhigh` | `·xH` |
+  | `max` | `·MAX` |
+
+- The bracket stays **bare** (`[Opus 4.8]`) when the current model has no effort setting (the field
+  is simply absent), so it's never a fabricated or stale value.
+
+> Why glued to the model rather than a standalone segment? Effort is *how hard this model is
+> thinking* — it belongs with the model's identity, and staying a single left-anchored glyph keeps
+> the context-window gauge (the whole point of Clepsydre) protected from the right-edge clip. See
+> [ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md).
 
 | Env var | Default | What it does |
 | --- | --- | --- |
-| `CLEPSYDRE_EFFORT` | *(on)* | `0` (or `false`/`no`/`off`) hides the 💪 effort segment |
+| `CLEPSYDRE_EFFORT` | *(on)* | `0` (or `false`/`no`/`off`) hides the effort glyph (bare bracket) |
 
 To **opt out**, set it in the same `"env"` block, globally or per-project (see above):
 
@@ -299,3 +315,17 @@ To **opt out**, set it in the same `"env"` block, globally or per-project (see a
 - **Claude Code CLI only.** Clepsydre plugs into the CLI's status line. The **Claude
   Desktop** app doesn't work like that — it has its own context-management mechanisms and
   no status line to hook into — so Clepsydre doesn't apply there (for now).
+
+## Acknowledgements
+
+Clepsydre is better because people sent great ideas upstream. Huge thanks to:
+
+- **[@guillaumejay](https://github.com/guillaumejay)** — the **git `↑ahead ↓behind ±dirty`
+  counts** (on by default).
+- **[@anaelChardan](https://github.com/anaelChardan)** — the **reasoning-effort** indicator
+  (`[Opus 4.8·H]`), surfacing your live `/effort` level right in the model bracket.
+
+Their contributions were merged with credit; where the maintainer adjusted a new segment's
+placement, it followed the documented ordering rule in
+[ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md), never taste — the
+contributors' own logic is preserved.
