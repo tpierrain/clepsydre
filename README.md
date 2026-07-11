@@ -76,7 +76,7 @@ Reading the example line above from left to right:
 | Piece | Means |
 | --- | --- |
 | `[Opus 4.8·H]` | The **model** currently answering you, with its **reasoning effort** compacted to a single glyph right after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here `·H` = *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)). Tracks live `/effort` changes; the bracket stays bare (`[Opus 4.8]`) when the model has no effort setting. A trailing parenthetical qualifier is dropped (`Opus 4.8 (1M context)` → `Opus 4.8`) to keep the label short. |
-| `📁 my-project` | The **folder** (project) you're working in. |
+| `📁 my-project` | The **folder** (project) you're working in. Capped at 20 chars by default (middle ellipsis); tune or disable with `CLEPSYDRE_FOLDER_MAX` (see [bounding a long folder name](#bounding-a-long-folder-name-on-by-default)). |
 | `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Capped at 30 chars by default (middle ellipsis); tune or disable with `CLEPSYDRE_BRANCH_MAX` (see [bounding a long branch name](#bounding-a-long-branch-name-on-by-default)). Outside a repo, this whole part just disappears. |
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
@@ -304,6 +304,37 @@ long one is shortened:
 > evicted by a secondary segment growing to its left. See
 > [ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md) for how segment
 > ordering encodes this priority.
+
+## Bounding a long folder name (on by default)
+
+The `📁` folder name sits *left* of the token gauge too, so a long project name (say
+`second-brain-generator`) pushes the gauge the same way a long branch does. It's **capped at 20
+characters by default** — tighter than the branch (30), because the folder is the more redundant
+of the two: you usually know which project you're in. Normal names (`clepsydre`, `my-project`)
+show in full; only a long one is shortened:
+
+```
+# a 22-char folder, default cap
+[Opus 4.8] 📁 second-b…nerator ⎇ main · 🧠 65.3k/230.0k (28%) · …
+```
+
+- Same rule as the branch: a **total character count**, ellipsis included, clipped in the **middle**
+  so the distinctive **head** and **tail** both survive.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_FOLDER_MAX` | `20` | A positive integer sets the cap (total chars, middle ellipsis). `0` (or `false`/`no`/`off`) disables it → the folder shows **in full**. |
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_FOLDER_MAX": "0"
+  }
+}
+```
+
+> Same rationale as the branch cap — a secondary, variable-length segment must never evict the
+> token gauge to its left ([ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md)).
 
 ## Reasoning effort (on by default, opt-out)
 

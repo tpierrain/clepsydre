@@ -54,8 +54,8 @@ Adopt an **ordering invariant: a segment's left-to-right position encodes its pr
 
   Omitted entirely when the current model has no effort field (bracket stays bare, e.g.
   `[Sonnet 4.6]`).
-- **Variable-length secondary segments — notably the git branch — must be bounded** (truncated)
-  or placed to the right of tier-1, so they can never evict the crown jewel.
+- **Variable-length secondary segments — notably the git branch and the folder name — must be
+  bounded** (truncated) or placed to the right of tier-1, so they can never evict the crown jewel.
 
 **Canonical order, left → right by priority:**
 
@@ -79,6 +79,11 @@ Adopt an **ordering invariant: a segment's left-to-right position encodes its pr
   ellipsis (keeps the distinctive head `feature/…` and tail `…-name`, unlike a tail-only cut);
   tunable via `CLEPSYDRE_BRANCH_MAX`, and `0`/`off` opts out to a full branch (fine on a wide
   screen, where nothing is evicted anyway). Default-bounded keeps this invariant true out of the box.
+- **The folder name is width-capped too** — same reasoning as the branch. _Implemented
+  (2026-07-11):_ bounded **by default at 20 chars** (tighter than the branch's 30: the folder is the
+  more redundant of the two — you usually know which project you're in) with the same **middle**
+  ellipsis, sharing the `truncateMiddle` helper; tunable via `CLEPSYDRE_FOLDER_MAX`, `0`/`off` opts
+  out to the full name. Closes the last unbounded variable-length segment left of tier-1.
 - **No truncation machinery required:** the invariant rides the terminal's own right-edge
   clipping. Simplicity preserved.
 

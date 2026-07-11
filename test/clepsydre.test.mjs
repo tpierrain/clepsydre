@@ -10,7 +10,7 @@ import {
   computeMemDir, readMemory, resolveThresholds, gitCounts, parseGitStatus,
   resolveGitCounts, gitInfo, resolveEffort, effortInfo, effortGlyph,
   fmtCountdown, rateTier, resolveRateWindow, rateInfo, compactModelName,
-  truncateBranch, resolveBranchMax,
+  truncateBranch, resolveBranchMax, truncateMiddle, resolveFolderMax,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -313,6 +313,28 @@ test('resolveBranchMax: 0/off/false/no disables the cap → Infinity (full branc
   }
 });
 
+test('resolveFolderMax: no env var falls back to the default 20-char cap (bounded by default)', () => {
+  assert.equal(resolveFolderMax({}), 20);
+});
+
+test('resolveFolderMax: a valid positive override wins over the default', () => {
+  assert.equal(resolveFolderMax({ CLEPSYDRE_FOLDER_MAX: '28' }), 28);
+});
+
+test('resolveFolderMax: 0/off/false/no disables the cap → Infinity (full folder, opt-out)', () => {
+  for (const off of ['0', 'off', 'false', 'no', 'OFF']) {
+    assert.equal(resolveFolderMax({ CLEPSYDRE_FOLDER_MAX: off }), Infinity);
+  }
+});
+
+test('truncateMiddle: a value wider than max keeps head AND tail, ellipsis in the middle', () => {
+  assert.equal(truncateMiddle('second-brain-generator', 16), 'second-b…nerator');
+});
+
+test('truncateMiddle: a value within max passes through unchanged, no ellipsis', () => {
+  assert.equal(truncateMiddle('clepsydre', 20), 'clepsydre');
+});
+
 test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only, never lose the branch', () => {
   const run = (dir, args) => {
     if (args[0] === 'status') throw new Error('porcelain unsupported / git hiccup');
@@ -422,6 +444,14 @@ test('buildStatusLine: an explicit branchMax overrides the default cap', () => {
     used: 65300, max: 230000, mem: null, branchMax: 12,
   });
   assert.match(line, /⎇ featur…-name ·/); // clipped to 12 total chars at the caller's cap
+});
+
+test('buildStatusLine: an explicit folderMax clips a long folder name, ellipsis in the middle', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'second-brain-generator', git: { branch: 'main' },
+    used: 65300, max: 230000, mem: null, folderMax: 16,
+  });
+  assert.match(line, /📁 second-b…nerator ⎇/); // 16 total chars, head+tail, ellipsis middle
 });
 
 test('parseGitStatus: branch, ahead/behind and dirty from porcelain-v2 output', () => {
@@ -590,7 +620,7 @@ test('end-to-end: CLEPSYDRE_* env vars retune the token tier color', () => {
     input: payload,
     encoding: 'utf8',
     env: {
-      ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '',
+      ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_FOLDER_MAX: '0',
       CLEPSYDRE_TOKEN_WARN: '190000', CLEPSYDRE_TOKEN_CRAZY: '250000',
     },
   });
@@ -657,6 +687,41 @@ test('end-to-end: with no CLEPSYDRE_BRANCH_MAX a long branch is clipped at the 3
   assert.match(out, /⎇ feature\/some-re…ng-branch-name ·/); // bounded by default, no env needed
 });
 
+test('end-to-end: with no CLEPSYDRE_FOLDER_MAX a long folder is clipped at the 20-char default', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  // A long prefix guarantees the temp basename exceeds the 20-char default cap.
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-second-brain-generator-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' }, // no FOLDER_MAX → default 20
+  });
+  assert.match(out, /📁 clepsydre-…\S+ ·/); // bounded by default: head + middle ellipsis, no env needed
+});
+
+test('end-to-end: CLEPSYDRE_FOLDER_MAX=0 opts out → the full folder name shows', () => {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-second-brain-generator-'));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  const payload = JSON.stringify({
+    model: { display_name: 'TestModel' },
+    workspace: { current_dir: work },
+    context_window: { total_input_tokens: 65300, total_output_tokens: 0, context_window_size: 1000000 },
+  });
+  const out = execFileSync('node', [script], {
+    input: payload,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_FOLDER_MAX: '0' },
+  });
+  assert.match(out, new RegExp(`📁 ${path.basename(work)} ·`)); // opted out: no ellipsis, full name
+});
+
 test('end-to-end: git-counts opted OUT (=0) → branch only, no ↑↓± suffix even when dirty', () => {
   const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
@@ -708,7 +773,7 @@ test('end-to-end: git-counts flag ON but NOT a git repo → full line still rend
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '1' },
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_GIT_COUNTS: '1', CLEPSYDRE_FOLDER_MAX: '0' },
   });
   // A git failure with counts ON costs only the git segment: the rest of the bar is intact.
   assert.equal(
@@ -767,7 +832,7 @@ test('end-to-end: piping Claude Code JSON prints the composed status line', () =
   const out = execFileSync('node', [script], {
     input: payload,
     encoding: 'utf8',
-    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
+    env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_FOLDER_MAX: '0' },
   });
   // No memory folder here, so the segment is shown empty (0B/0f) rather than dropped.
   assert.equal(

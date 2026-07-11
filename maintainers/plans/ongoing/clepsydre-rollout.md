@@ -132,6 +132,32 @@ placement/rendering only — driven by the documented rule, not taste.
       **@anaelChardan** and **@guillaumejay** in the notes.
       _(2026-07-11 · **v1.4.0 — "The One That Trims the Long Names"**, tag on `d7d4f47`)_
 
+## Next up — bound the folder segment (field feedback, 2026-07-11)
+
+> From Thomas's `second-brain-generator` session on v1.4.0: the line rendered
+> `[Opus 4.8·H] 📁 second-brain-generator ⎇ test/rag-mutation-hardening ±5 · 🧠 0/300.0k (0%) · 🧩 MEMORY.md 8.7K · …`
+> — tier-1 fully visible, rate window clipped (correct per ADR 0002). The gap it exposed:
+> `truncateBranch` bounds the branch, but `path.basename(dir)` (📁 folder) is **unbounded** — a
+> variable-length segment left of tier-1 that ADR 0002 says must be bounded. **Decision (Thomas):
+> bound the folder** (not be more aggressive on the branch — that would sacrifice a wanted signal
+> for the designed-sacrificial one). Strict TDD, suite green before each commit.
+
+- [x] **15. Bound the git-folder width — mirror the branch cap.**
+      _(2026-07-11 · strict TDD, suite green at 111)_
+  - [x] Extract a shared `truncateMiddle(text, max)` pure helper (the middle-ellipsis logic
+        formerly inside `truncateBranch`); `truncateBranch` now delegates to it (back-compat).
+  - [x] Add `resolveFolderMax(env)` + `CLEPSYDRE_FOLDER_MAX`, mirroring `resolveBranchMax`:
+        default 20 (tighter than the branch's 30 — the folder is more redundant), positive
+        override, `0`/`off`/`false`/`no` → uncapped opt-out.
+  - [x] Thread `folderMax` through `buildStatusLine` (truncate `basename`) and wire
+        `resolveFolderMax(process.env)` in `main`; decoupled three folder-agnostic e2e tests via
+        `CLEPSYDRE_FOLDER_MAX=0`. Strict TDD, suite green.
+  - [x] Update the README (How to read it row + a "Bounding a long folder name" section) and
+        reconcile ADR 0002 (folder now bounded, like the branch).
+- [ ] **16. Fold into the v1.4.0 release — NO new version** (Thomas' explicit ask). Same theme
+      ("The One That Trims the Long Names"): move the `v1.4.0` tag to the folder-cap commit, push it,
+      and add a folder-cap highlight to the existing release notes. No MINOR bump.
+
 ## Remaining — human-only field checks (no code)
 
 These can't be done from this dev Mac: they need a fresh install on the *other* machines. A

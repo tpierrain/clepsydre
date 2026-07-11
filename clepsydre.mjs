@@ -152,18 +152,23 @@ export function gitCounts(ahead = 0, behind = 0, dirty = 0) {
   return parts.join(' ');
 }
 
-// Bound the git-branch width so this variable-length segment can never evict the
-// left-anchored tier-1 (token gauge, memory) on a narrow terminal (ADR 0002). A
-// branch within `max` shows in full; a longer one is clipped to `max` total chars
-// with an ellipsis IN THE MIDDLE — keeping both the distinctive head (`feature/…`)
-// and tail (`…-ticket-42`), which a tail-only cut would throw away. The `max-1`
-// real chars split head-heavy (the extra char goes to the front).
-export function truncateBranch(branch, max) {
-  if (branch.length <= max) return branch;
+// Middle-ellipsis truncation for a variable-length segment (branch, folder) so it can never
+// evict the left-anchored tier-1 (token gauge, memory) on a narrow terminal (ADR 0002). A value
+// within `max` passes through unchanged; a longer one is clipped to `max` total chars with an
+// ellipsis IN THE MIDDLE — keeping both the distinctive head (`feature/…`) and tail (`…-ticket-42`),
+// which a tail-only cut would throw away. The `max-1` real chars split head-heavy (the extra char
+// goes to the front).
+export function truncateMiddle(text, max) {
+  if (text.length <= max) return text;
   const keep = max - 1; // room for the real chars once the '…' takes one
   const head = Math.ceil(keep / 2);
   const tail = Math.floor(keep / 2);
-  return branch.slice(0, head) + '…' + (tail > 0 ? branch.slice(-tail) : '');
+  return text.slice(0, head) + '…' + (tail > 0 ? text.slice(-tail) : '');
+}
+
+// Bound the git-branch width (ADR 0002) — a thin, intent-revealing alias over truncateMiddle.
+export function truncateBranch(branch, max) {
+  return truncateMiddle(branch, max);
 }
 
 // Compact the model's display name for the [model] bracket: drop a trailing
@@ -227,12 +232,28 @@ export function resolveBranchMax(env = {}) {
   return Math.trunc(positiveOr(raw, DEFAULT_BRANCH_MAX));
 }
 
+// Default cap for the rendered folder width (chars, ellipsis included). Bounded BY DEFAULT for the
+// same ADR 0002 reason as the branch, but tighter (20 vs 30): the 📁 folder is more redundant — you
+// usually know which project you're in — so it's a cheaper segment to trim. Normal project folders
+// (clepsydre, my-project) show in full; only a long one gets a middle ellipsis.
+const DEFAULT_FOLDER_MAX = 20;
+
+// The folder-width cap, from CLEPSYDRE_FOLDER_MAX. Same contract as resolveBranchMax:
+//   • unset / non-numeric → the 20-char default;
+//   • a positive integer → that width;
+//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full folder name).
+export function resolveFolderMax(env = {}) {
+  const raw = env.CLEPSYDRE_FOLDER_MAX;
+  if (!enabledUnlessOptedOut(raw)) return Infinity; // 0/off/false/no → uncapped
+  return Math.trunc(positiveOr(raw, DEFAULT_FOLDER_MAX));
+}
+
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
 // fs or git here). `git` is { branch, ahead, behind, dirty } and `mem` is
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, basename, git, used, max, mem, effort, rate, thresholds, branchMax = resolveBranchMax() }) {
+export function buildStatusLine({ model, basename, git, used, max, mem, effort, rate, thresholds, branchMax = resolveBranchMax(), folderMax = resolveFolderMax() }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
@@ -240,7 +261,7 @@ export function buildStatusLine({ model, basename, git, used, max, mem, effort, 
   // and glued inside the [model] bracket with a middot — so it stays left-most and can never
   // grow the line or evict the token gauge. A null effort leaves the bracket bare.
   const effortTag = effort ? `·${effortGlyph(effort)}` : '';
-  let out = `[${model}${effortTag}] 📁 ${basename}`;
+  let out = `[${model}${effortTag}] 📁 ${truncateMiddle(basename, folderMax)}`;
   if (git?.branch) {
     out += ` ⎇ ${truncateBranch(git.branch, branchMax)}`;
     const counts = gitCounts(git.ahead, git.behind, git.dirty);
@@ -409,6 +430,7 @@ export function main() {
     rate,
     thresholds: resolveThresholds(process.env),
     branchMax: resolveBranchMax(process.env),
+    folderMax: resolveFolderMax(process.env),
   });
   process.stdout.write(line + '\n');
 }
