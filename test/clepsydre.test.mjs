@@ -11,7 +11,7 @@ import {
   resolveGitCounts, gitInfo, resolveEffort, effortInfo, effortGlyph,
   fmtCountdown, rateTier, resolveRateWindow, rateInfo, compactModelName,
   truncateBranch, resolveBranchMax, truncateMiddle, resolveFolderMax,
-  fmtWindowSize, resolveModelMax, responsiveCap,
+  fmtWindowSize, resolveModelMax, displayWidth, allocateNameCaps,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -318,22 +318,12 @@ test('truncateBranch: a branch within max passes through unchanged, no ellipsis'
   assert.equal(truncateBranch('main', 12), 'main');
 });
 
-test('resolveBranchMax: no env var falls back to the default 12-char cap (bounded by default)', () => {
-  assert.equal(resolveBranchMax({}), 12);
+test('resolveBranchMax: no env var → null (auto: the responsive budget sizes it from COLUMNS)', () => {
+  assert.equal(resolveBranchMax({}), null);
 });
 
-test('resolveBranchMax: a valid positive override wins over the default', () => {
+test('resolveBranchMax: a valid positive override wins (a fixed cap, never responsive)', () => {
   assert.equal(resolveBranchMax({ CLEPSYDRE_BRANCH_MAX: '40' }), 40);
-});
-
-test('resolveBranchMax: COLUMNS widens the default cap (responsive) — 12 narrow, 20 medium, ∞ wide', () => {
-  assert.equal(resolveBranchMax({ COLUMNS: '80' }), 12);       // narrow → today's cap
-  assert.equal(resolveBranchMax({ COLUMNS: '120' }), 20);      // medium → looser
-  assert.equal(resolveBranchMax({ COLUMNS: '200' }), Infinity); // wide → full branch name
-});
-
-test('resolveBranchMax: an explicit override still wins over the responsive default', () => {
-  assert.equal(resolveBranchMax({ CLEPSYDRE_BRANCH_MAX: '40', COLUMNS: '80' }), 40);
 });
 
 test('resolveBranchMax: 0/off/false/no disables the cap → Infinity (full branch, opt-out)', () => {
@@ -342,51 +332,17 @@ test('resolveBranchMax: 0/off/false/no disables the cap → Infinity (full branc
   }
 });
 
-test('resolveFolderMax: no env var, conditional default — 12 with a git branch, 25 without', () => {
-  assert.equal(resolveFolderMax({}, true), 12); // a branch shares the space left of tier-1 → tighter
-  assert.equal(resolveFolderMax({}, false), 25); // no branch → the folder owns that space → looser
+test('resolveFolderMax: no env var → null (auto: the responsive budget sizes it from COLUMNS)', () => {
+  assert.equal(resolveFolderMax({}), null);
 });
 
-test('resolveFolderMax: a valid positive override wins over the default', () => {
+test('resolveFolderMax: a valid positive override wins (a fixed cap, never responsive)', () => {
   assert.equal(resolveFolderMax({ CLEPSYDRE_FOLDER_MAX: '28' }), 28);
-});
-
-test('resolveFolderMax: COLUMNS widens the default cap, per hasBranch (responsive)', () => {
-  // with a branch: 12 narrow → 20 medium → ∞ wide
-  assert.equal(resolveFolderMax({ COLUMNS: '80' }, true), 12);
-  assert.equal(resolveFolderMax({ COLUMNS: '120' }, true), 20);
-  assert.equal(resolveFolderMax({ COLUMNS: '200' }, true), Infinity);
-  // without a branch (folder owns the space): 25 narrow → 40 medium → ∞ wide
-  assert.equal(resolveFolderMax({ COLUMNS: '80' }, false), 25);
-  assert.equal(resolveFolderMax({ COLUMNS: '120' }, false), 40);
-  assert.equal(resolveFolderMax({ COLUMNS: '200' }, false), Infinity);
-});
-
-test('resolveFolderMax: an explicit override still wins over the responsive default', () => {
-  assert.equal(resolveFolderMax({ CLEPSYDRE_FOLDER_MAX: '28', COLUMNS: '80' }, true), 28);
 });
 
 test('resolveFolderMax: 0/off/false/no disables the cap → Infinity (full folder, opt-out)', () => {
   for (const off of ['0', 'off', 'false', 'no', 'OFF']) {
     assert.equal(resolveFolderMax({ CLEPSYDRE_FOLDER_MAX: off }), Infinity);
-  }
-});
-
-test('responsiveCap: a narrow terminal (< 100 columns) keeps the tight cap', () => {
-  assert.equal(responsiveCap(80, 12, 20), 12);
-});
-
-test('responsiveCap: a wide terminal (>= 160 columns) uncaps → Infinity (full names)', () => {
-  assert.equal(responsiveCap(200, 12, 20), Infinity);
-});
-
-test('responsiveCap: a medium terminal (100–159 columns) uses the looser medium cap', () => {
-  assert.equal(responsiveCap(120, 12, 20), 20);
-});
-
-test('responsiveCap: a non-number width falls back to the tight cap (backward-compatible)', () => {
-  for (const bad of [undefined, null, NaN, '200', 'abc']) {
-    assert.equal(responsiveCap(bad, 12, 20), 12); // only real finite numbers select a band
   }
 });
 
@@ -1032,4 +988,104 @@ test('end-to-end: effort opted OUT (=0) → the [model] bracket stays bare even 
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '', CLEPSYDRE_EFFORT: '0', CLEPSYDRE_MODEL_MAX: '0' },
   });
   assert.match(out, /^\[TestModel\] /); // bare bracket — no ·MAX
+});
+
+test('displayWidth: plain ASCII counts one column per character', () => {
+  assert.equal(displayWidth('main'), 4);
+});
+
+test('displayWidth: ANSI color escapes are stripped, not counted', () => {
+  assert.equal(displayWidth(`${GREEN}main${RESET}`), 4);
+});
+
+test('displayWidth: a wide (double-column) glyph counts as 2 — ⏳ is length-1 but 2 columns', () => {
+  assert.equal('⏳'.length, 1);        // one UTF-16 unit…
+  assert.equal(displayWidth('⏳'), 2); // …but two terminal columns
+});
+
+test('displayWidth: the ⌛ and ⚠ warning glyphs are double-width too', () => {
+  assert.equal(displayWidth('⌛'), 2);
+  assert.equal(displayWidth('⚠'), 2);
+});
+
+test('displayWidth: a variation-selector-16 (emoji presentation) adds no column — ⚠️ stays 2', () => {
+  assert.equal('⚠️'.length, 2);        // base + U+FE0F selector
+  assert.equal(displayWidth('⚠️'), 2); // the selector is zero-width
+});
+
+test('displayWidth: astral-plane emoji (🧠 📁) are double-width', () => {
+  assert.equal(displayWidth('🧠'), 2);
+  assert.equal(displayWidth('📁'), 2);
+  assert.equal(displayWidth('🧠 65.3k'), 8); // emoji(2) + space(1) + 5 chars
+});
+
+test('allocateNameCaps: unknown width (no COLUMNS) falls back to today’s fixed caps', () => {
+  // with a branch → folder 12 / branch 12
+  assert.deepEqual(
+    allocateNameCaps({ columns: undefined, overhead: 50, folderLen: 30, branchLen: 20 }),
+    { folderCap: 12, branchCap: 12 },
+  );
+  // no branch → folder 25 / branch 0
+  assert.deepEqual(
+    allocateNameCaps({ columns: undefined, overhead: 50, folderLen: 30, branchLen: 0 }),
+    { folderCap: 25, branchCap: 0 },
+  );
+});
+
+test('allocateNameCaps: when both names fit the budget, show them in full (no truncation)', () => {
+  // budget = 200 − 50 = 150; 22 + 27 = 49 ≤ 150 → full names
+  assert.deepEqual(
+    allocateNameCaps({ columns: 200, overhead: 50, folderLen: 22, branchLen: 27 }),
+    { folderCap: 22, branchCap: 27 },
+  );
+});
+
+test('allocateNameCaps: over budget, the folder yields first — branch fully protected', () => {
+  // budget = 90 − 50 = 40; 22 + 27 = 49 > 40 → cut 9 from the folder (22→13), branch keeps 27
+  assert.deepEqual(
+    allocateNameCaps({ columns: 90, overhead: 50, folderLen: 22, branchLen: 27 }),
+    { folderCap: 13, branchCap: 27 },
+  );
+});
+
+test('allocateNameCaps: an explicit cap is honoured and consumes its share; the auto name gets the rest', () => {
+  // branch pinned at 12 (consumes 12 of the 40 budget) → folder auto gets the remaining 28
+  assert.deepEqual(
+    allocateNameCaps({ columns: 90, overhead: 50, folderLen: 30, branchLen: 27, branchMax: 12 }),
+    { folderCap: 28, branchCap: 12 },
+  );
+  // folder opt-out (Infinity) shows full (consumes 22) → branch auto gets the remaining 18
+  assert.deepEqual(
+    allocateNameCaps({ columns: 90, overhead: 50, folderLen: 22, branchLen: 27, folderMax: Infinity }),
+    { folderCap: 22, branchCap: 18 },
+  );
+});
+
+test('buildStatusLine: a wide terminal shows the folder and branch names in full (responsive)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'second-brain-generator',
+    git: { branch: 'test/rag-mutation-hardening' },
+    used: 65300, max: 230000, mem: null, columns: 300,
+  });
+  assert.match(line, /📁 second-brain-generator ⎇ test\/rag-mutation-hardening ·/);
+});
+
+test('buildStatusLine: a narrow terminal protects the gauge — folder yields, line fits COLUMNS', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'second-brain-generator',
+    git: { branch: 'test/rag-mutation-hardening' },
+    used: 65300, max: 230000, mem: null, columns: 80,
+  });
+  assert.ok(line.includes(`${GREEN}🧠 65.3k/230.0k (28%)${RESET}`)); // the token gauge is intact
+  assert.match(line, /📁 \S*…\S* ⎇ /);                              // the folder is truncated (yields first)
+  assert.ok(displayWidth(line) <= 80, `line width ${displayWidth(line)} must fit 80 columns`);
+});
+
+test('buildStatusLine: pathologically long names on a wide terminal still never push the gauge off', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'y'.repeat(70),
+    git: { branch: 'feature/' + 'x'.repeat(70) },
+    used: 65300, max: 230000, mem: null, columns: 160,
+  });
+  assert.ok(displayWidth(line) <= 160, `line width ${displayWidth(line)} must fit 160 columns`);
 });

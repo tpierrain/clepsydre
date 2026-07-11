@@ -349,24 +349,26 @@ below). Normal names (`clepsydre`, `my-project`) show in full; only a long one i
 
 The folder and branch caps above are **tight on purpose only when your terminal is narrow** — where
 space is scarce and the gauge really is at risk. On a **wider** terminal there is room to spare, so
-Clepsydre **widens the caps automatically** and stops truncating for nothing: `second…rator` becomes
-`second-brain-generator` once it fits. Three width bands (read from the terminal's `COLUMNS`):
+Clepsydre **widens the names automatically** and stops truncating for nothing: `second…rator` becomes
+`second-brain-generator` once it fits.
 
-| Terminal width (`COLUMNS`) | branch | folder (with branch) | folder (no branch) |
-| --- | --- | --- | --- |
-| narrow (`< 100`) | 12 | 12 | 25 |
-| medium (`100–159`) | 20 | 20 | 40 |
-| wide (`≥ 160`) | full name | full name | full name |
+It does this by spending the *actually available* width, read from the terminal's `COLUMNS`: it
+measures how many columns everything else takes (the model badge, the token gauge, the git counts)
+and hands **whatever is left** to the folder and branch names. If both fit, you see them in full; if
+not, the names shrink by exactly as much as the width demands — and no more.
 
+- **The token gauge is always protected.** Because the caps are derived from the leftover width, the
+  folder and branch can **never** push the gauge (or memory) off-screen — not even with
+  pathologically long names on a wide terminal. Under pressure the **branch is kept and the folder
+  yields first** (it's the more redundant of the two — you usually know which project you're in).
 - **Zero regression, zero config.** If the width is unknown (`COLUMNS` absent or unreadable), you get
-  exactly today's tight caps — the narrow row. Nothing to set up.
-- **Expansion only.** Widening the caps can never cost the token gauge or memory their place: the
-  band caps are sized so the gauge stays on screen even at the narrow end of each band
-  ([ADR 0006](maintainers/docs/adr/0006-responsive-width-caps.md)).
+  exactly today's fixed caps (12 / 25). Nothing to set up.
 - **Your explicit caps still win.** A `CLEPSYDRE_BRANCH_MAX` / `CLEPSYDRE_FOLDER_MAX` you set (including
-  `0` to disable) overrides the responsive default — set one and width no longer changes that segment.
+  `0` to show the name in full) overrides the automatic sizing for that segment.
 - **Adapts on the next render, not live.** Resize the terminal and the new width is picked up on the
   **next** status-line render (each turn), not mid-drag.
+
+See [ADR 0006](maintainers/docs/adr/0006-responsive-width-caps.md) for the design.
 
 ## Model window size (on by default, opt-out)
 

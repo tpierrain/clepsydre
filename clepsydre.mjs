@@ -171,6 +171,25 @@ export function truncateBranch(branch, max) {
   return truncateMiddle(branch, max);
 }
 
+// Rendered display width of a string in terminal columns — used to measure the fixed line
+// overhead so the responsive caps know how much room is left for the folder/branch names.
+// Terminal-column width of the double-width glyphs Clepsydre actually renders that are NOT in the
+// astral plane (BMP symbols whose UTF-16 length is 1 but which occupy 2 columns): ⏳ ⌛ ⚠.
+const WIDE_GLYPHS = new Set([0x23f3, 0x231b, 0x26a0]);
+export function displayWidth(str) {
+  const bare = str.replace(/\x1b\[[0-9;]*m/g, '');
+  let width = 0;
+  for (const ch of bare) {
+    const cp = ch.codePointAt(0);
+    if (cp === 0xfe0f) continue; // variation-selector-16 (emoji presentation) → zero-width
+    // Astral-plane code points (> U+FFFF) are emoji here, all double-width; plus the known BMP
+    // wide glyphs. Conservative by design: over-counting only tightens a name by a column, it can
+    // never under-reserve and let the token gauge get clipped.
+    width += cp > 0xffff || WIDE_GLYPHS.has(cp) ? 2 : 1;
+  }
+  return width;
+}
+
 // Compact the model's display name for the [model] bracket: drop a trailing
 // parenthetical qualifier like "Opus 4.8 (1M context)" → "Opus 4.8", so the
 // left-anchored label stays short and never eats the line (ADR 0002). A name
@@ -234,65 +253,76 @@ export function rateInfo(rateLimits, now) {
   return { pct: Math.trunc(w.used_percentage), resetIn };
 }
 
-// Default cap for the rendered branch width (chars, ellipsis included). Bounded BY DEFAULT so a
-// long branch — which sits left of the token gauge — can't push tier-1 off a narrow terminal
-// (ADR 0002). Tightened over two rounds of field feedback (30 → 18 → 12): even an 18-char cap still
-// let branch + folder together clip the memory segment. Normal names (main, feature/foo) show in
-// full; a long one gets a middle ellipsis.
+// Fixed fallback caps (chars, ellipsis included) — used only when the terminal width is unknown
+// (no COLUMNS): today's behaviour, tightened over field-feedback rounds (30 → 18 → 12). With a
+// known width the responsive budget (allocateNameCaps) supersedes these. The folder default is
+// conditional: 12 WITH a branch (the two variable segments share the space left of tier-1), 25
+// WITHOUT (the folder owns that space alone — and it's the more redundant of the two, so it gets
+// the looser figure). See ADR 0002 / 0006.
 const DEFAULT_BRANCH_MAX = 12;
-const MEDIUM_BRANCH_MAX = 20;
+const FOLDER_MAX_WITH_BRANCH = 12;
+const FOLDER_MAX_WITHOUT_BRANCH = 25;
 
-// The branch-width cap, from CLEPSYDRE_BRANCH_MAX (an explicit override) else responsive on COLUMNS:
-//   • a positive integer in CLEPSYDRE_BRANCH_MAX → that width (an explicit override always wins);
-//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full branch, for wide screens);
-//   • otherwise → the width-aware default (responsiveCap on COLUMNS): 12 narrow, 20 medium, ∞ wide;
-//     an absent / non-numeric COLUMNS falls back to the tight 12 — today's behaviour, zero regression.
-// Truncated to an integer since it drives string slicing.
+// Resolve the *explicit* branch/folder cap from the env, or null = "auto" (let the responsive
+// budget decide). An explicit CLEPSYDRE_*_MAX always wins over the responsive default:
+//   • a positive integer → that width (truncated to an int, it drives string slicing);
+//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full name, for wide screens);
+//   • unset / non-numeric → null → auto (allocateNameCaps sizes it from COLUMNS).
 export function resolveBranchMax(env = {}) {
   const raw = env.CLEPSYDRE_BRANCH_MAX;
   if (!enabledUnlessOptedOut(raw)) return Infinity; // 0/off/false/no → uncapped
-  const override = positiveOr(raw, null); // an explicit CLEPSYDRE_BRANCH_MAX still wins
-  if (override !== null) return Math.trunc(override);
-  return responsiveCap(positiveOr(env.COLUMNS, NaN), DEFAULT_BRANCH_MAX, MEDIUM_BRANCH_MAX);
+  const override = positiveOr(raw, null);
+  return override === null ? null : Math.trunc(override);
 }
 
-// Default folder-width caps (chars, ellipsis included), bounded BY DEFAULT for the same ADR 0002
-// reason as the branch. The default is CONDITIONAL on whether a git branch is also shown:
-//   • WITH a branch → 12, matching the branch cap: the two variable-length segments share the space
-//     left of tier-1, so each stays tight so neither crowds the token gauge + memory.
-//   • WITHOUT a branch → 25: the folder then owns that whole space alone (non-git working dir), so it
-//     can breathe. The 📁 folder is also more redundant than the branch — you usually know which
-//     project you're in — which is why it, not the branch, absorbs the looser figure.
-const FOLDER_MAX_WITH_BRANCH = 12;
-const FOLDER_MAX_WITHOUT_BRANCH = 25;
-const FOLDER_MEDIUM_WITH_BRANCH = 20;
-const FOLDER_MEDIUM_WITHOUT_BRANCH = 40;
-
-// The folder-width cap, from CLEPSYDRE_FOLDER_MAX (an explicit override) else responsive on COLUMNS.
-// Same contract as resolveBranchMax, but the responsive default depends on `hasBranch` (see above):
-//   • a positive integer in CLEPSYDRE_FOLDER_MAX → that width (an explicit override always wins);
-//   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full folder name);
-//   • otherwise → the width-aware default (responsiveCap on COLUMNS): with a branch 12/20/∞,
-//     without a branch 25/40/∞ (narrow/medium/wide). Absent / non-numeric COLUMNS → the tight
-//     default (12 or 25) — today's behaviour, zero regression.
-export function resolveFolderMax(env = {}, hasBranch = false) {
+export function resolveFolderMax(env = {}) {
   const raw = env.CLEPSYDRE_FOLDER_MAX;
   if (!enabledUnlessOptedOut(raw)) return Infinity; // 0/off/false/no → uncapped
-  const override = positiveOr(raw, null); // an explicit CLEPSYDRE_FOLDER_MAX still wins
-  if (override !== null) return Math.trunc(override);
-  const tight = hasBranch ? FOLDER_MAX_WITH_BRANCH : FOLDER_MAX_WITHOUT_BRANCH;
-  const medium = hasBranch ? FOLDER_MEDIUM_WITH_BRANCH : FOLDER_MEDIUM_WITHOUT_BRANCH;
-  return responsiveCap(positiveOr(env.COLUMNS, NaN), tight, medium);
+  const override = positiveOr(raw, null);
+  return override === null ? null : Math.trunc(override);
 }
 
-// Width-aware cap resolver (pure). Picks a cap from the terminal width (COLUMNS) using
-// CSS-style bands — never by measuring the composed line (the line is full of double-width
-// glyphs; true fitting is fragile). Narrow terminals keep the tight cap; wider ones expand.
-export function responsiveCap(columns, tight, medium) {
-  if (!Number.isFinite(columns)) return tight; // unknown width → today's fixed cap (zero regression)
-  if (columns >= 160) return Infinity;
-  if (columns >= 100) return medium;
-  return tight;
+// Allocate the folder/branch display caps from the terminal width (COLUMNS) — the responsive core.
+// Rather than pick from static bands, it spends the *actually available* columns:
+//   budget = columns − overhead   (overhead = displayWidth of everything else up to the token gauge)
+// then hands that budget to the two names. If both fit, they show in FULL (no truncation, even on a
+// very wide terminal); under pressure the branch is protected and the folder yields first, each with
+// a comfort floor so neither vanishes. An explicit CLEPSYDRE_*_MAX (Infinity = opt-out, or a number)
+// still wins and simply consumes its share of the budget. Unknown width → today's fixed caps.
+const NAME_FLOOR = 8; // keep each name at least this wide under pressure, when the budget allows
+export function allocateNameCaps({ columns, overhead, folderLen, branchLen, folderMax = null, branchMax = null }) {
+  const hasBranch = branchLen > 0;
+  const folderFixed = hasBranch ? FOLDER_MAX_WITH_BRANCH : FOLDER_MAX_WITHOUT_BRANCH;
+  const branchFixed = hasBranch ? DEFAULT_BRANCH_MAX : 0;
+
+  // Unknown width → today's fixed caps (explicit env still honoured).
+  if (!Number.isFinite(columns)) {
+    return { folderCap: folderMax ?? folderFixed, branchCap: branchMax ?? branchFixed };
+  }
+
+  const budget = columns - overhead;
+  const folderAuto = folderMax === null;
+  const branchAuto = branchMax === null;
+  // Columns an explicitly-capped segment eats up (Infinity = opt-out → its full length); and the
+  // concrete cap that segment renders at.
+  const consume = (len, cap) => (cap === Infinity ? len : Math.min(len, cap));
+  const explicit = (len, cap) => (cap === Infinity ? len : cap);
+
+  // Explicit segments claim their share first; the auto segment(s) split what remains.
+  let avail = budget;
+  if (!folderAuto) avail -= consume(folderLen, folderMax);
+  if (hasBranch && !branchAuto) avail -= consume(branchLen, branchMax);
+
+  if (folderAuto && branchAuto && hasBranch) {
+    // Both auto: if they fit, show both in full; else protect the branch, folder yields first.
+    if (folderLen + branchLen <= avail) return { folderCap: folderLen, branchCap: branchLen };
+    const branchCap = Math.min(branchLen, Math.max(avail - NAME_FLOOR, NAME_FLOOR));
+    return { folderCap: Math.max(avail - branchCap, 0), branchCap };
+  }
+  // At most one auto segment: it takes what's left, the other renders at its explicit cap.
+  const folderCap = folderAuto ? Math.max(Math.min(folderLen, avail), 0) : explicit(folderLen, folderMax);
+  const branchCap = !hasBranch ? 0 : branchAuto ? Math.max(Math.min(branchLen, avail), 0) : explicit(branchLen, branchMax);
+  return { folderCap, branchCap };
 }
 
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
@@ -300,7 +330,7 @@ export function responsiveCap(columns, tight, medium) {
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, modelMax, basename, git, used, max, mem, effort, rate, thresholds, branchMax = resolveBranchMax(), folderMax = resolveFolderMax({}, !!git?.branch) }) {
+export function buildStatusLine({ model, modelMax, basename, git, used, max, mem, effort, rate, thresholds, columns, branchMax = null, folderMax = null }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
@@ -311,11 +341,31 @@ export function buildStatusLine({ model, modelMax, basename, git, used, max, mem
   // The offering's context-window size (e.g. "1M") qualifies the model, so it sits right after the
   // name and before the effort glyph: [Opus 4.8 1M·H]. Omitted when unknown (null), never guessed.
   const maxTag = modelMax ? ` ${modelMax}` : '';
-  let out = `[${model}${maxTag}${effortTag}] 📁 ${truncateMiddle(basename, folderMax)}`;
-  if (git?.branch) {
-    out += ` ⎇ ${truncateBranch(git.branch, branchMax)}`;
-    const counts = gitCounts(git.ahead, git.behind, git.dirty);
-    if (counts) out += ` ${ORANGE}${counts}${RESET}`;
+  const bracket = `[${model}${maxTag}${effortTag}]`;
+
+  const hasBranch = !!git?.branch;
+  const counts = hasBranch ? gitCounts(git.ahead, git.behind, git.dirty) : '';
+  const countsPart = counts ? ` ${ORANGE}${counts}${RESET}` : '';
+
+  // Responsive caps: overhead = the display width of the gauge-protected prefix *minus* the folder
+  // and branch names, so allocateNameCaps knows how many columns are left for those two variable
+  // segments and can protect the token gauge for ANY name length (see ADR 0006).
+  const overhead =
+    displayWidth(`${bracket} 📁 `) +
+    (hasBranch ? displayWidth(' ⎇ ') + displayWidth(countsPart) : 0) +
+    displayWidth(` · ${tok}`);
+  const { folderCap, branchCap } = allocateNameCaps({
+    columns,
+    overhead,
+    folderLen: basename.length,
+    branchLen: hasBranch ? git.branch.length : 0,
+    folderMax,
+    branchMax,
+  });
+
+  let out = `${bracket} 📁 ${truncateMiddle(basename, folderCap)}`;
+  if (hasBranch) {
+    out += ` ⎇ ${truncateBranch(git.branch, branchCap)}${countsPart}`;
   }
   out += ` · ${tok}`;
   if (mem) {
@@ -482,8 +532,11 @@ export function main() {
     effort,
     rate,
     thresholds: resolveThresholds(process.env),
+    // Terminal width Claude Code sets for the status-line process (ADR 0006); undefined when absent
+    // or non-numeric → allocateNameCaps falls back to the fixed caps. Drives the responsive sizing.
+    columns: positiveOr(process.env.COLUMNS, undefined),
     branchMax: resolveBranchMax(process.env),
-    folderMax: resolveFolderMax(process.env, !!git.branch),
+    folderMax: resolveFolderMax(process.env),
   });
   process.stdout.write(line + '\n');
 }

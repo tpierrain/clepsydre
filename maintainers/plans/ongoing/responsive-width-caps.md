@@ -8,30 +8,45 @@
 ## Tracking
 
 - [x] **Gate — does Claude Code expose the terminal width?** PASSED (`COLUMNS` env, verified live).
-- [x] **1. Bands, not pixel-fitting** — decided below _(2026-07-11)_.
-- [x] **2. Backward-compatible fallback = today's caps** — `responsiveCap` non-number guard → tight; 128 tests green _(2026-07-11)_.
-- [x] **3. ADR 0002 invariant preserved** — override wins first, then responsive default (expansion only) _(2026-07-11)_.
-- [x] **4. TDD the pure `responsiveCap` resolver + wire it into the cap resolvers** — 8 new tests, wired into `resolveBranchMax`/`resolveFolderMax`; `main()` unchanged (already passes `process.env`); smoke-tested at 80/120/200 cols _(2026-07-11)_.
-- [x] **5. New ADR** — [`0006-responsive-width-caps.md`](../../docs/adr/0006-responsive-width-caps.md), cross-linked from ADR 0002; invariant restated as unchanged _(2026-07-11)_.
+- [x] **1. ~~Bands~~ → dynamic width budget** — bands shipped first (5b33461) then **superseded**: static
+      bands with `wide → ∞` don't protect the gauge against *pathologically long* folder+branch on a wide
+      terminal (Thomas, 2026-07-11). Pivoted to a content-aware budget — decided below _(2026-07-11)_.
+- [x] **2. Backward-compatible fallback = today's caps** — no `COLUMNS` → fixed 12/12/25 _(2026-07-11)_.
+- [x] **3. ADR 0002 invariant preserved** — now **guaranteed**, not just for normal names: the gauge is
+      protected by construction (budget = COLUMNS − overhead) _(2026-07-11)_.
+- [x] **4. TDD the dynamic budget** — pure `displayWidth` + `allocateNameCaps`, wired into `buildStatusLine` _(2026-07-11)_.
+  - [x] ~~`responsiveCap` bands + wiring~~ shipped in 5b33461, replaced.
+  - [x] `displayWidth(str)` — ANSI-strip + conservative wide-char (emoji) counting (6 tests).
+  - [x] `allocateNameCaps(...)` — budget split, folder yields first, floors (4 tests).
+  - [x] Wire into `buildStatusLine` (measure overhead, allocate) + `main` (pass `COLUMNS`); 3 integration tests incl. the pathological-names invariant `displayWidth(line) ≤ COLUMNS`.
+  - [x] Remove the superseded bands (`responsiveCap`, MEDIUM_* constants, band tests). 133 green; smoke-tested 70/90/120/300 cols.
+- [x] **5. ADR** — [`0006`](../../docs/adr/0006-responsive-width-caps.md) rewritten (bands → budget), with a *History* note on the pivot _(2026-07-11)_.
 - [ ] **6. README + release** — MINOR bump, *"The One That…"*.
-  - [x] README documents the responsive behaviour + `COLUMNS` (new "Responsive to your terminal width" section + both cap sections + top table) _(2026-07-11)_.
-  - [ ] Commit the change (awaiting explicit go from Thomas).
-  - [ ] Bump version + publish the release (MINOR, *"The One That…"* title).
-- [ ] **7. Field checks** — validate bands on real terminals (Mac + Windows, narrow + wide).
+  - [x] Rewrite the "Responsive to your terminal width" section (bands table → budget explanation) _(2026-07-11)_.
+  - [ ] Commit the pivot.
+  - [ ] Bump version + publish the release (v1.5.0 candidate — see below).
+- [ ] **7. Field checks** — validate on real terminals (Mac + Windows, narrow + wide, long names).
 
-### Band decision (step 1) — three bands, conservative medium
+### Design (step 1) — dynamic width budget, folder yields first
 
-`COLUMNS` (integer) selects one of three bands. `wide → Infinity` follows the plan's sketch (full
-names); the medium caps are sized so that even at the band's **narrowest** column count, the fixed
-overhead + folder + branch still leaves the token gauge on screen (ADR 0002 invariant).
+Caps are **derived from the actually-available width**, not from static bands:
 
-| Band   | `COLUMNS`   | branch | folder (with branch) | folder (no branch) |
-|--------|-------------|--------|----------------------|--------------------|
-| narrow | `< 100`     | 12     | 12                   | 25                 |
-| medium | `100–159`   | 20     | 20                   | 40                 |
-| wide   | `≥ 160`     | ∞      | ∞                    | ∞                  |
+1. **overhead** = `displayWidth` of the gauge-protected prefix *excluding* the folder/branch name
+   characters: model badge + ` 📁 ` + ` ⎇ ` + git counts + ` · ` + the token gauge. `displayWidth`
+   strips ANSI and counts emoji as **2 columns** (conservative — over-counting only tightens names by
+   a column, it never risks the gauge).
+2. **budget** = `COLUMNS − overhead` = the columns left for the two names combined.
+3. **Allocation** (folder yields first — Thomas, 2026-07-11): if both names fit the budget, show both
+   in full (no truncation, even on very wide terminals). Under pressure the **branch is protected**
+   and the **folder absorbs the deficit** first, each with a floor (~8) so neither vanishes; if even
+   the floors don't fit, the deficit spills onto the *sacrificable* memory/rate segments (clipped by
+   the terminal), **never onto the gauge**.
+4. **Fallback** = today's fixed caps (12/12/25) when `COLUMNS` is absent/non-numeric — zero regression.
+5. **Explicit overrides win**: `CLEPSYDRE_BRANCH_MAX` / `CLEPSYDRE_FOLDER_MAX` (incl. `0`=uncap) are
+   honoured as-is and consume their share of the budget before the auto segments are allocated.
 
-_Narrow = today's exact caps (zero regression). Numbers are field-tunable (step 7)._
+_Why this beats bands: the gauge is protected for **any** name length, and we truncate only exactly as
+much as the real width demands — never "for nothing" in a mid-range width either._
 
 ## Why
 
