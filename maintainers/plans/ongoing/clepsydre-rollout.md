@@ -8,10 +8,10 @@
 > [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md); **step 13** shortened
 > the line (model label compacted, git branch bounded-by-default at 30, opt-out via
 > `CLEPSYDRE_BRANCH_MAX=0`). **Shipped as v1.4.0** — "The One That Trims the Long Names", crediting
-> @anaelChardan & @guillaumejay. **Next actionable step: 19** — tighten the git/folder caps (branch 18,
-> folder 18-with-branch / 30-without) after field feedback; the human-only field checks (steps 5–6)
-> then remain (they need the other machines, not this dev Mac). Start at the first unchecked `- [ ]`;
-> tick boxes and note
+> @anaelChardan & @guillaumejay. **Step 19 done** (2026-07-11 · `dd11d63`) — git/folder caps tightened
+> (branch 18, folder 18-with-branch / 30-without), folded into v1.4.0 (tag moved, notes fixed); this
+> also subsumed step 16. **Only the human-only field checks (steps 5–6) remain** — they need the other
+> machines (Mac + Windows), not this dev Mac. Start at the first unchecked `- [ ]`; tick boxes and note
 > _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
@@ -198,7 +198,7 @@ placement/rendering only — driven by the documented rule, not taste.
 > suite green before each commit. Full detail: `~/.claude/plans/jaunty-launching-seal.md`.
 
 - [ ] **19. Branch cap 18; folder cap 18-with-branch / 30-without.**
-      _(code + tests + docs done 2026-07-11, strict TDD, suite green at 120; release fold pending Thomas)_
+      _(code + tests + docs done 2026-07-11 · `dd11d63`, strict TDD, suite green at 120; release fold pending Thomas)_
   - [x] `clepsydre.mjs`: `DEFAULT_BRANCH_MAX` 30 → **18**; replaced `DEFAULT_FOLDER_MAX = 20` with
         `FOLDER_MAX_WITH_BRANCH = 18` + `FOLDER_MAX_WITHOUT_BRANCH = 30`; made
         `resolveFolderMax(env = {}, hasBranch = false)` pick the conditional default (explicit env still
@@ -213,11 +213,11 @@ placement/rendering only — driven by the documented rule, not taste.
         long branch name" 30 → 18; "Bounding a long folder name" — conditional default (18 with a
         branch, 30 without).
   - [x] ADR 0002 consequences: branch 30 → 18; folder → the with/without-branch conditional (18 / 30).
-  - [ ] **Fold into v1.4.0 — NO new version** (recommended; only tunes v1.4.0's own cap feature): move
-        the `v1.4.0` tag to the new commit, push, and fix the release notes where they say "capped at 30
-        characters" (branch) / "capped at 20 characters" (folder) → 18 / (18-with-branch, 30-without).
-        Pre-flight English-only. _(Or PATCH v1.4.1 — decide with Thomas.)_ **This also subsumes step 16
-        below** (its folder-cap tag-move is redone here in one pass).
+  - [x] **Fold into v1.4.0 — NO new version** (Thomas' choice, 2026-07-11): moved the `v1.4.0` tag
+        `dc00d2e` → `dd11d63` (force-pushed), pushed `main`, and fixed the release notes (branch
+        "capped at 30" → 18; folder "capped at 20" → conditional 18-with-branch / 30-without; the
+        "Tune the caps" defaults line). Pre-flight English-only ✓. **Subsumed step 16** (its folder-cap
+        tag-move done here in one pass).
 
 ## Remaining — human-only field checks (no code)
 
