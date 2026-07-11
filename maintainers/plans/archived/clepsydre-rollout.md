@@ -1,6 +1,13 @@
-# 🏺 Clepsydre — rollout, git-counts & external-segment PRs (ongoing)
+# 🏺 Clepsydre — rollout, git-counts & external-segment PRs (ARCHIVED)
 
-> **The single active plan.** The git-counts feature **and** both external-contributor PRs
+> **✅ ARCHIVED 2026-07-11 — historical record; do not resume.** All shipping work is done and
+> released (v1.2.0 → v1.4.0). The only items left were **human-only cross-platform field checks
+> (steps 5–6, Mac + Windows)**, now **abandoned** — never run, and not blocking: Clepsydre has been
+> used daily on macOS across v1.2.0–v1.5.0 with no regression, and Windows validation can be reopened
+> as a fresh plan if/when someone runs it on a Windows box. The remaining boxes below are closed as
+> **won't-do** (struck through), not as done.
+
+> **Shipped summary.** The git-counts feature **and** both external-contributor PRs
 > (#5 effort, #4 rate-window) are shipped and released in **v1.3.0** under
 > [ADR 0002](../../docs/adr/0002-segment-ordering-encodes-priority.md). **Steps 12 & 13 done**
 > (2026-07-11): **step 12** (show the rate window from session start) was **abandoned** — a startup
@@ -10,10 +17,9 @@
 > `CLEPSYDRE_BRANCH_MAX=0`). **Shipped as v1.4.0** — "The One That Trims the Long Names", crediting
 > @anaelChardan & @guillaumejay. **Step 19 done** (2026-07-11 · `dd11d63`, retightened `d9aebe2`) —
 > git/folder caps bounded, then tightened over two field rounds to **branch 12, folder 12-with-branch /
-> 25-without**, folded into v1.4.0 (tag moved, notes fixed); this also subsumed step 16. **Only the
-> human-only field checks (steps 5–6) remain** — they need the other machines (Mac + Windows), not this
-> dev Mac. Start at the first unchecked `- [ ]`; tick boxes and note _(date · commit)_ as you go.
+> 25-without**, folded into v1.4.0 (tag moved, notes fixed); this also subsumed step 16.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
+> Superseded by the responsive caps of [`../archived/responsive-width-caps.md`](../archived/responsive-width-caps.md) (v1.5.0).
 
 ## Shipped (git-counts feature — done)
 
@@ -220,26 +226,26 @@ placement/rendering only — driven by the documented rule, not taste.
         "Tune the caps" defaults line). Pre-flight English-only ✓. **Subsumed step 16** (its folder-cap
         tag-move done here in one pass).
 
-## Remaining — human-only field checks (no code)
+## Remaining — human-only field checks (no code) — ABANDONED 2026-07-11
 
-These can't be done from this dev Mac: they need a fresh install on the *other* machines. A
-human runs them and ticks the boxes.
+These could only be done from the *other* machines (Mac + Windows), never from this dev Mac. They
+were **never run** and are now **closed as won't-do** (struck through). Not blocking — macOS is
+validated daily through v1.5.0; reopen as a fresh plan if Windows validation is ever needed.
 
-- [ ] **5. Roll out to the other machines (Mac + Windows)** — the cross-platform confirmation.
-  - [ ] `git clone git@github.com:tpierrain/clepsydre.git ~/clepsydre` (home by default — avoid
-        `~/Dev/clepsydre`, which collides with the dev checkout on this Mac).
-  - [ ] `cd ~/clepsydre && node install.mjs`, restart Claude Code, confirm the gauge shows
-        (Windows included — Node only, no jq/bc).
-  - [ ] **Watch during the Windows run** — two edge findings from the 2026-07-03 code review left
-        unpatched on purpose (no repro possible on macOS, so no failing test to drive a fix):
-    - [ ] **stdin read** (`fs.readFileSync(0)`) — confirm real numbers, not a degraded `[?] 📁 …`
-          line (Windows pipe/fd-0 can throw `EAGAIN`). If it degrades, capture it and harden with
-          a real repro.
-    - [ ] **memory-folder encoding** (`computeMemDir` fallback) — confirm the 🧩 `MEMORY.md`
+- [x] ~~**5. Roll out to the other machines (Mac + Windows)** — the cross-platform confirmation.~~ **Abandoned.**
+  - [x] ~~`git clone git@github.com:tpierrain/clepsydre.git ~/clepsydre` (home by default — avoid
+        `~/Dev/clepsydre`, which collides with the dev checkout on this Mac).~~
+  - [x] ~~`cd ~/clepsydre && node install.mjs`, restart Claude Code, confirm the gauge shows
+        (Windows included — Node only, no jq/bc).~~
+  - [x] ~~**Watch during the Windows run** — two edge findings from the 2026-07-03 code review left
+        unpatched on purpose (no repro possible on macOS, so no failing test to drive a fix):~~
+    - [x] ~~**stdin read** (`fs.readFileSync(0)`) — confirm real numbers, not a degraded `[?] 📁 …`
+          line (Windows pipe/fd-0 can throw `EAGAIN`).~~ _(Unverified on Windows — reopen if it degrades in the field.)_
+    - [x] ~~**memory-folder encoding** (`computeMemDir` fallback) — confirm the 🧩 `MEMORY.md`
           segment is non-zero where memories exist (the `C:\…` → `C--…` cwd encoding is an
-          unverified assumption about `~/.claude/projects/**` naming on Windows).
+          unverified assumption about `~/.claude/projects/**` naming on Windows).~~ _(Unverified on Windows.)_
 
-- [ ] **6. Housekeeping (optional)** — remove the old `~/.claude/statusline-command.sh` (bash) by
-      hand, no longer referenced once `settings.json` points at `clepsydre.mjs`.
+- [x] ~~**6. Housekeeping (optional)** — remove the old `~/.claude/statusline-command.sh` (bash) by
+      hand, no longer referenced once `settings.json` points at `clepsydre.mjs`.~~ **Abandoned** (optional; harmless if left).
 
-> When both are ticked, this plan is fully done → move it to `../archived/`.
+> Closed as won't-do 2026-07-11 → file moved to `../archived/`.

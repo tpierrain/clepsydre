@@ -1,8 +1,9 @@
 # 🏺 Clepsydre — build & rollout plan (ARCHIVED)
 
 > **Archived — historical record of shipped work.** Every step here is done and checked,
-> with its _(date · commit)_. Do **not** resume from this file. Remaining work lives in the
-> single ongoing plan: [`../ongoing/clepsydre-rollout.md`](../ongoing/clepsydre-rollout.md).
+> with its _(date · commit)_. Do **not** resume from this file. Its follow-up,
+> [`./clepsydre-rollout.md`](./clepsydre-rollout.md), is **also archived** — its only leftover
+> (Mac/Windows field checks) was abandoned 2026-07-11. No ongoing plan remains.
 
 Single-purpose repo: a context-window status line for Claude Code (see `README.md`).
 

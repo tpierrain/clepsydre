@@ -75,5 +75,5 @@ synchronous scan is cheap enough that the added complexity isn't warranted.
 - Benchmark is a point-in-time snapshot (git 2.52.0, macOS/APFS, Apple Silicon). `git status`
   can be made dramatically faster with `core.fsmonitor` / `core.untrackedCache`, but those are
   user-side git configs we don't assume; the numbers above are stock git.
-- Related history: [`maintainers/plans/ongoing/clepsydre-rollout.md`](../../plans/ongoing/clepsydre-rollout.md)
+- Related history: [`maintainers/plans/archived/clepsydre-rollout.md`](../../plans/archived/clepsydre-rollout.md)
   (steps 3–4) and the archived build-and-rollout plan.
