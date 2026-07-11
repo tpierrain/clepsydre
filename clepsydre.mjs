@@ -236,9 +236,10 @@ export function rateInfo(rateLimits, now) {
 
 // Default cap for the rendered branch width (chars, ellipsis included). Bounded BY DEFAULT so a
 // long branch — which sits left of the token gauge — can't push tier-1 off a narrow terminal
-// (ADR 0002). Generous enough that normal names (main, feature/foo) show in full; only a
-// pathological one gets a middle ellipsis.
-const DEFAULT_BRANCH_MAX = 30;
+// (ADR 0002). Tightened 30 → 18 after field feedback: a 27-char branch under the old 30 cap still
+// crowded the gauge + memory. Normal names (main, feature/foo) show in full; a long one gets a
+// middle ellipsis.
+const DEFAULT_BRANCH_MAX = 18;
 
 // The branch-width cap, from CLEPSYDRE_BRANCH_MAX. Bounded by default (DEFAULT_BRANCH_MAX):
 //   • unset / non-numeric → the 30-char default;
@@ -251,20 +252,26 @@ export function resolveBranchMax(env = {}) {
   return Math.trunc(positiveOr(raw, DEFAULT_BRANCH_MAX));
 }
 
-// Default cap for the rendered folder width (chars, ellipsis included). Bounded BY DEFAULT for the
-// same ADR 0002 reason as the branch, but tighter (20 vs 30): the 📁 folder is more redundant — you
-// usually know which project you're in — so it's a cheaper segment to trim. Normal project folders
-// (clepsydre, my-project) show in full; only a long one gets a middle ellipsis.
-const DEFAULT_FOLDER_MAX = 20;
+// Default folder-width caps (chars, ellipsis included), bounded BY DEFAULT for the same ADR 0002
+// reason as the branch. The default is CONDITIONAL on whether a git branch is also shown:
+//   • WITH a branch → 18, matching the branch cap: the two variable-length segments share the space
+//     left of tier-1, so each stays tight so neither crowds the token gauge + memory.
+//   • WITHOUT a branch → 30: the folder then owns that whole space alone (non-git working dir), so it
+//     can breathe. The 📁 folder is also more redundant than the branch — you usually know which
+//     project you're in — which is why it, not the branch, absorbs the looser figure.
+const FOLDER_MAX_WITH_BRANCH = 18;
+const FOLDER_MAX_WITHOUT_BRANCH = 30;
 
-// The folder-width cap, from CLEPSYDRE_FOLDER_MAX. Same contract as resolveBranchMax:
-//   • unset / non-numeric → the 20-char default;
-//   • a positive integer → that width;
+// The folder-width cap, from CLEPSYDRE_FOLDER_MAX. Same contract as resolveBranchMax, but the default
+// depends on `hasBranch` (see above):
+//   • unset / non-numeric → 18 when a branch is shown, else 30;
+//   • a positive integer → that width (an explicit override wins regardless of hasBranch);
 //   • 0 / off / false / no → Infinity, i.e. NO cap (opt-out: full folder name).
-export function resolveFolderMax(env = {}) {
+export function resolveFolderMax(env = {}, hasBranch = false) {
   const raw = env.CLEPSYDRE_FOLDER_MAX;
   if (!enabledUnlessOptedOut(raw)) return Infinity; // 0/off/false/no → uncapped
-  return Math.trunc(positiveOr(raw, DEFAULT_FOLDER_MAX));
+  const def = hasBranch ? FOLDER_MAX_WITH_BRANCH : FOLDER_MAX_WITHOUT_BRANCH;
+  return Math.trunc(positiveOr(raw, def));
 }
 
 // Compose the whole status line from already-resolved primitives (pure — no stdin,
@@ -272,7 +279,7 @@ export function resolveFolderMax(env = {}) {
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, modelMax, basename, git, used, max, mem, effort, rate, thresholds, branchMax = resolveBranchMax(), folderMax = resolveFolderMax() }) {
+export function buildStatusLine({ model, modelMax, basename, git, used, max, mem, effort, rate, thresholds, branchMax = resolveBranchMax(), folderMax = resolveFolderMax({}, !!git?.branch) }) {
   const t = thresholds ?? resolveThresholds();
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
@@ -455,7 +462,7 @@ export function main() {
     rate,
     thresholds: resolveThresholds(process.env),
     branchMax: resolveBranchMax(process.env),
-    folderMax: resolveFolderMax(process.env),
+    folderMax: resolveFolderMax(process.env, !!git.branch),
   });
   process.stdout.write(line + '\n');
 }

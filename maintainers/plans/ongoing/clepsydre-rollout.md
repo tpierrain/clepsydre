@@ -8,8 +8,10 @@
 > [ADR 0004](../../docs/adr/0004-rate-window-renders-only-from-fresh-data.md); **step 13** shortened
 > the line (model label compacted, git branch bounded-by-default at 30, opt-out via
 > `CLEPSYDRE_BRANCH_MAX=0`). **Shipped as v1.4.0** — "The One That Trims the Long Names", crediting
-> @anaelChardan & @guillaumejay. **Only the human-only field checks (steps 5–6) remain** — they need
-> the other machines, not this dev Mac. Start at the first unchecked `- [ ]`; tick boxes and note
+> @anaelChardan & @guillaumejay. **Next actionable step: 19** — tighten the git/folder caps (branch 18,
+> folder 18-with-branch / 30-without) after field feedback; the human-only field checks (steps 5–6)
+> then remain (they need the other machines, not this dev Mac). Start at the first unchecked `- [ ]`;
+> tick boxes and note
 > _(date · commit)_ as you go.
 > Shipped history: [`../archived/clepsydre-build-and-rollout.md`](../archived/clepsydre-build-and-rollout.md).
 
@@ -154,9 +156,11 @@ placement/rendering only — driven by the documented rule, not taste.
         `CLEPSYDRE_FOLDER_MAX=0`. Strict TDD, suite green.
   - [x] Update the README (How to read it row + a "Bounding a long folder name" section) and
         reconcile ADR 0002 (folder now bounded, like the branch).
-- [ ] **16. Fold into the v1.4.0 release — NO new version** (Thomas' explicit ask). Same theme
+- [x] **16. Fold into the v1.4.0 release — NO new version** (Thomas' explicit ask). Same theme
       ("The One That Trims the Long Names"): move the `v1.4.0` tag to the folder-cap commit, push it,
       and add a folder-cap highlight to the existing release notes. No MINOR bump.
+      _(SUPERSEDED by step 19's release fold — step 19 re-tunes this same folder cap 20 → 18, so the
+      tag-move + notes fix are done there in one pass, not twice.)_
 
 ## Next up — model window-size badge (field feedback, 2026-07-11)
 
@@ -182,6 +186,38 @@ placement/rendering only — driven by the documented rule, not taste.
 - [x] **18. Folded into v1.4.0** (Thomas' choice, 2026-07-11) — thematically coherent: v1.4.0 already
       compacted the model label; this keeps the window size in that tight label. Tag moved to `dc00d2e`,
       the "shorter model label" highlight reworked to the badge story. No new version.
+
+## Next up — tighten the git/folder caps (field feedback, 2026-07-11)
+
+> From Thomas, on a real repo (`second-brain-generator`, branch `test/rag-mutation-hardening` = 27
+> chars): the line still clips **tier-1** — `… 🧩 MEMORY.md 8…` — because the 27-char branch is **under**
+> the 30-char cap, shows in full, and crowds the gauge + memory (an ADR 0002 violation). Decision:
+> **both caps default to 18**; **exception** — with **no git branch** (non-git working dir) the folder is
+> capped looser at **30**, since it then owns the whole space left of tier-1. Explicit
+> `CLEPSYDRE_BRANCH_MAX` / `CLEPSYDRE_FOLDER_MAX` still override; `0`/`off` still opts out. Strict TDD,
+> suite green before each commit. Full detail: `~/.claude/plans/jaunty-launching-seal.md`.
+
+- [ ] **19. Branch cap 18; folder cap 18-with-branch / 30-without.**
+      _(code + tests + docs done 2026-07-11, strict TDD, suite green at 120; release fold pending Thomas)_
+  - [x] `clepsydre.mjs`: `DEFAULT_BRANCH_MAX` 30 → **18**; replaced `DEFAULT_FOLDER_MAX = 20` with
+        `FOLDER_MAX_WITH_BRANCH = 18` + `FOLDER_MAX_WITHOUT_BRANCH = 30`; made
+        `resolveFolderMax(env = {}, hasBranch = false)` pick the conditional default (explicit env still
+        wins); `buildStatusLine` default `folderMax = resolveFolderMax({}, !!git?.branch)`; `main` calls
+        `resolveFolderMax(process.env, !!git.branch)`. Rationale comment blocks updated.
+  - [x] Tests (`test/clepsydre.test.mjs`), red-first each: `resolveBranchMax` default → 18;
+        `resolveFolderMax` split into `({}, true) === 18` + `({}, false) === 30` (kept override + `0/off →
+        Infinity`); `buildStatusLine` long-branch clip → 18; e2e branch-cap default → 18; e2e folder-cap
+        non-git default → 30 (renamed); **added** an e2e: long folder **inside a git repo** clipped at 18.
+        Field render verified: `📁 second-br…enerator ⎇ test/rag-…ardening` (18/18, tier-1 fully visible).
+  - [x] README: "How to read it" rows (folder `18 (30 with no git branch)`, branch `18`); "Bounding a
+        long branch name" 30 → 18; "Bounding a long folder name" — conditional default (18 with a
+        branch, 30 without).
+  - [x] ADR 0002 consequences: branch 30 → 18; folder → the with/without-branch conditional (18 / 30).
+  - [ ] **Fold into v1.4.0 — NO new version** (recommended; only tunes v1.4.0's own cap feature): move
+        the `v1.4.0` tag to the new commit, push, and fix the release notes where they say "capped at 30
+        characters" (branch) / "capped at 20 characters" (folder) → 18 / (18-with-branch, 30-without).
+        Pre-flight English-only. _(Or PATCH v1.4.1 — decide with Thomas.)_ **This also subsumes step 16
+        below** (its folder-cap tag-move is redone here in one pass).
 
 ## Remaining — human-only field checks (no code)
 
