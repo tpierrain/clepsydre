@@ -87,7 +87,7 @@ Reading the example line above from left to right:
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
 | `🧠 65.3k/230.0k (28%)` | **The one that matters most: how full the context window is.** 65.3k tokens used out of a 230.0k working window = 28%. The icon is a traffic light: 🧠 green (fine) → ⚠️ orange (ease off) → 🤪 red (the "stupidity zone" — `/clear` now). |
-| `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). |
+| `🧩 MEMORY.md 4.2K` | Size of your **`MEMORY.md`** file — it's reloaded *in full every session*, so it eats context; the icon warns as it grows (🧩 → ⚠️ → 🧨). *On by default, opt-out* (see [memory weight](#memory-weight-on-by-default-opt-out)). |
 | `mem 18.0K/12f` | The **whole memory folder**: `18.0K` total across every memory file, `12f` = **12 files**. Reads on demand, so it doesn't cost context the way `MEMORY.md` does — this is just its footprint on disk. |
 | `⏳ 23% ↻ 2h13` | Your **5-hour rate window** (Pro/Max plans) — *on by default, opt-out* (see [rate window](#the-5-hour-rate-window-on-by-default-opt-out)). `23%` of the window already used, `↻ 2h13` until it resets. ⏳ green → ⚠️ orange (≥ 70%) → ⌛ red (≥ 90%). **Pinned far right** ([ADR 0002](maintainers/docs/adr/0002-segment-ordering-encodes-priority.md)) — first to clip on a narrow terminal, so it never squeezes the token gauge. Not on a subscription plan? The segment simply doesn't show. |
 
@@ -396,6 +396,33 @@ give ground; the token gauge, memory and rate window stay put the whole way down
   look tight for a moment, then settle.
 
 See [ADR 0006](maintainers/docs/adr/0006-responsive-width-caps.md) for the design.
+
+## Memory weight (on by default, opt-out)
+
+Clepsydre shows `MEMORY.md`'s size and the whole memory folder's tally as its own segment:
+
+```
+[Opus 4.8] 📁 my-project ⎇ main · 🧠 65.3k/230.0k (28%) · 🧩 MEMORY.md 4.2K · mem 18.0K/12f
+```
+
+- 🧩 green < 15K · ⚠️ orange 15–25K · 🧨 red ≥ 25K, tuned via `CLEPSYDRE_MEM_WARN` /
+  `CLEPSYDRE_MEM_ROT` (see [customize the color thresholds](#customize-the-color-thresholds)).
+- Still shown, at zero, on a project with no memories yet — the line never looks
+  half-installed.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_MEM` | *(on)* | `0` (or `false`/`no`/`off`) hides the whole segment (`MEMORY.md` + `mem`) |
+
+To **opt out**, same `"env"` block as everything else, globally or per-project:
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_MEM": "0"
+  }
+}
+```
 
 ## Model window size (on by default, opt-out)
 

@@ -12,7 +12,7 @@ import {
   fmtCountdown, rateTier, resolveRateWindow, rateInfo, compactModelName,
   truncateBranch, resolveBranchMax, truncateMiddle, resolveFolderMax,
   fmtWindowSize, resolveModelMax, displayWidth, allocateNameCaps,
-  resolveWidthReserve, usableColumns, shouldCollapseNames,
+  resolveWidthReserve, usableColumns, shouldCollapseNames, resolveMem,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -255,6 +255,22 @@ test('resolveEffort: other truthy spellings (1/true/yes/on, any case) → enable
 test('resolveEffort: explicit opt-out (0/false/no/off, any case) → disabled', () => {
   for (const v of ['0', 'false', 'FALSE', 'no', 'off', ' Off ']) {
     assert.equal(resolveEffort({ CLEPSYDRE_EFFORT: v }), false, v);
+  }
+});
+
+test('resolveMem: absent flag → enabled (on by default)', () => {
+  assert.equal(resolveMem({}), true);
+});
+
+test('resolveMem: other truthy spellings (1/true/yes/on, any case) → enabled', () => {
+  for (const v of ['1', 'true', 'TRUE', 'yes', 'on', ' On ']) {
+    assert.equal(resolveMem({ CLEPSYDRE_MEM: v }), true, v);
+  }
+});
+
+test('resolveMem: explicit opt-out (0/false/no/off, any case) → disabled', () => {
+  for (const v of ['0', 'false', 'FALSE', 'no', 'off', ' Off ']) {
+    assert.equal(resolveMem({ CLEPSYDRE_MEM: v }), false, v);
   }
 });
 
