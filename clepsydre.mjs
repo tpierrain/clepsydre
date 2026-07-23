@@ -217,6 +217,12 @@ export function resolveModelMax(env = {}) {
   return enabledUnlessOptedOut(env.CLEPSYDRE_MODEL_MAX);
 }
 
+// The memory segment (MEMORY.md + mem tally) is on by default; opt out with
+// CLEPSYDRE_MEM=0/off/false/no.
+export function resolveMem(env = {}) {
+  return enabledUnlessOptedOut(env.CLEPSYDRE_MEM);
+}
+
 // Pure extraction of the reasoning-effort level from Claude Code's `effort` input:
 // the level string (low|medium|high|xhigh|max) or null when unavailable — the field
 // only exists when the current model supports the effort parameter, so null means
@@ -574,7 +580,7 @@ export function main() {
 
   const transcript =
     input.transcript_path && input.transcript_path !== 'null' ? input.transcript_path : '';
-  const mem = readMemory(computeMemDir(transcript, dir, os.homedir()));
+  const mem = resolveMem(process.env) ? readMemory(computeMemDir(transcript, dir, os.homedir())) : null;
 
   const git = gitInfo(dir, resolveGitCounts(process.env));
   const effort = resolveEffort(process.env) ? effortInfo(input.effort) : null;
