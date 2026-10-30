@@ -83,6 +83,7 @@ Reading the example line above from left to right:
 | --- | --- |
 | `[Opus 4.8 1M·H]` | The **model** currently answering you. `1M` is the **context window it exposes** (`1M`, `200k`, …) — the real size Claude Code reports for the model, compacted to a short badge; *on by default, opt-out* via `CLEPSYDRE_MODEL_MAX` (see [model window size](#model-window-size-on-by-default-opt-out)). Never guessed, never a hardcoded table. `·H` is the **reasoning effort** compacted to a single glyph after a middot: `·L`/`·M`/`·H`/`·xH`/`·MAX` (here *high*) — *on by default, opt-out* (see [reasoning effort](#reasoning-effort-on-by-default-opt-out)); tracks live `/effort` changes. The bracket drops whatever doesn't apply (`[Opus 4.8]` when there's neither). |
 | `📁 my-project` | The **folder** (project) you're working in. Capped at 12 chars on a narrow terminal by default (25 with no git branch), widening on wider terminals (middle ellipsis); tune or disable with `CLEPSYDRE_FOLDER_MAX` (see [bounding a long folder name](#bounding-a-long-folder-name-on-by-default)). |
+| `🌿` instead of `📁` | You're in a **linked git worktree** (`git worktree add`, or a Claude Code `--worktree` session), not the main checkout. *On by default, opt-out* (see [git worktree marker](#git-worktree-marker-on-by-default-opt-out)). |
 | `⎇ main` | The current **git branch** (`⎇` is the git branch symbol). Capped at 12 chars on a narrow terminal by default, widening on wider terminals (middle ellipsis); tune or disable with `CLEPSYDRE_BRANCH_MAX` (see [bounding a long branch name](#bounding-a-long-branch-name-on-by-default)). Outside a repo, this whole part just disappears. |
 | `↑2 ↓1 ±8` | **Git state** — *on by default, opt-out* (see [git counts](#git-aheadbehinddirty-counts-on-by-default-opt-out)). `↑2` = 2 local commits **ahead** of the remote (to push); `↓1` = 1 commit **behind** (to pull); `±8` = 8 files with **uncommitted changes** (your edits + brand-new files). Each shows only when it isn't zero — a clean, in-sync repo shows nothing here. |
 | `·` | Just a **separator** between groups. |
@@ -517,6 +518,33 @@ To **opt out**, same `"env"` block as everything else, globally or per-project:
   }
 }
 ```
+
+## Git worktree marker (on by default, opt-out)
+
+In a **linked git worktree** the folder icon turns from `📁` into `🌿`, so you can tell at a glance which checkout this session works in:
+
+```
+[Opus 4.8 1M·H] 📁 my-project ⎇ main · 🧠 65.3k/300.0k (22%) · …
+[Opus 4.8 1M·H] 🌿 my-project-wt ⎇ feature/x · 🧠 12.0k/300.0k (4%) · …
+```
+
+- It covers every linked worktree: one made with `git worktree add`, or by a Claude Code `--worktree` session. The main checkout (and a submodule) keeps `📁`.
+- The icon swap costs no width, and `🌿` stays when narrow terminals collapse the names to icons.
+- Outside a repo, or with a git older than 2.31, the icon stays `📁`: never a guessed marker.
+
+| Env var | Default | What it does |
+| --- | --- | --- |
+| `CLEPSYDRE_WORKTREE` | *(on)* | `0` (or `false`/`no`/`off`) keeps `📁` in a worktree too |
+
+```json
+{
+  "env": {
+    "CLEPSYDRE_WORKTREE": "0"
+  }
+}
+```
+
+> See [ADR 0007](maintainers/docs/adr/0007-worktree-marker-swaps-the-folder-icon.md) for why the marker is an icon swap rather than an extra segment.
 
 ## Requirements
 

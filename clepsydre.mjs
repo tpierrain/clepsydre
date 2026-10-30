@@ -115,6 +115,11 @@ export function resolveRateWindow(env = {}) {
   return enabledUnlessOptedOut(env.CLEPSYDRE_RATE_WINDOW);
 }
 
+// The linked-worktree marker flag (🌿 instead of 📁) - ON by default (ADR 0007).
+export function resolveWorktree(env = {}) {
+  return enabledUnlessOptedOut(env.CLEPSYDRE_WORKTREE);
+}
+
 // Compact countdown for the rate-window reset: "2h13" (minutes zero-padded),
 // or just "45m" under an hour.
 export function fmtCountdown(seconds) {
@@ -367,8 +372,11 @@ export function shouldCollapseNames({ columns, overhead, folderLen, branchLen })
 // { mdBytes, dirBytes, fileCount } — the live path always passes both (gitInfo/readMemory
 // return zeroed shapes outside a repo / empty folder). A null `git` or `mem` omits its
 // segment: a convenience for focused unit tests. Mirrors the bash assembly order.
-export function buildStatusLine({ model, modelMax, basename, git, used, max, mem, effort, rate, thresholds, columns, branchMax = null, folderMax = null }) {
+export function buildStatusLine({ model, modelMax, basename, git, used, max, mem, effort, rate, thresholds, columns, branchMax = null, folderMax = null, worktree = false }) {
   const t = thresholds ?? resolveThresholds();
+  // A linked git worktree swaps the folder icon (ADR 0007): same width, so no budget change, and it
+  // survives the collapse to icons.
+  const folderIcon = worktree ? '🌿' : '📁';
   const tier = tokenTier(used, t.token);
   const tok = `${tier.color}${tier.icon} ${fmtTokens(used)}/${fmtTokens(max)} (${pct(used, max)}%)${RESET}`;
   // Reasoning effort is anchored to the model label (ADR 0002): compacted to a single glyph
@@ -411,7 +419,7 @@ export function buildStatusLine({ model, modelMax, basename, git, used, max, mem
   // length; if even the floored names can't fit, only the rate window (rightmost) is clipped by the
   // terminal — never the gauge or memory (see ADR 0006).
   const overhead =
-    displayWidth(`${bracket} 📁 `) +
+    displayWidth(`${bracket} ${folderIcon} `) +
     (hasBranch ? displayWidth(' ⎇ ') + displayWidth(countsPart) : 0) +
     displayWidth(` · ${tok}`) +
     displayWidth(memPart) +
@@ -435,9 +443,9 @@ export function buildStatusLine({ model, modelMax, basename, git, used, max, mem
 
   let out;
   if (collapse) {
-    out = hasBranch ? `${bracket} 📁 ⎇${countsPart}` : `${bracket} 📁`;
+    out = hasBranch ? `${bracket} ${folderIcon} ⎇${countsPart}` : `${bracket} ${folderIcon}`;
   } else {
-    out = `${bracket} 📁 ${truncateMiddle(basename, folderCap)}`;
+    out = `${bracket} ${folderIcon} ${truncateMiddle(basename, folderCap)}`;
     if (hasBranch) {
       out += ` ⎇ ${truncateBranch(git.branch, branchCap)}${countsPart}`;
     }
@@ -555,6 +563,23 @@ export function gitInfo(dir, counts, run = runGit) {
   }
 }
 
+// Is `dir` inside a LINKED git worktree (`git worktree add`, Claude Code --worktree)? There the
+// per-worktree git dir (<common>/worktrees/<name>) differs from the shared common dir; in the main
+// checkout, and in a submodule, they are the same. One cheap rev-parse (reads paths, no working-tree
+// scan). Any git failure (no repo, git absent or older than 2.31's --path-format) → false: the plain
+// 📁 stays, never a fabricated 🌿. `run` is injectable for unit tests.
+export function isLinkedWorktree(dir, run = runGit) {
+  if (!dir) return false;
+  let out;
+  try {
+    out = run(dir, ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir']);
+  } catch {
+    return false;
+  }
+  const [gitDir, commonDir] = out.split('\n');
+  return gitDir !== commonDir;
+}
+
 // Thin main: read Claude Code's JSON on stdin, resolve the live bits, print the line.
 export function main() {
   let input = {};
@@ -599,6 +624,7 @@ export function main() {
     columns: usableColumns(process.env),
     branchMax: resolveBranchMax(process.env),
     folderMax: resolveFolderMax(process.env),
+    worktree: resolveWorktree(process.env) && isLinkedWorktree(dir),
   });
   process.stdout.write(line + '\n');
 }

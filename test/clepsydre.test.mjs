@@ -12,7 +12,8 @@ import {
   fmtCountdown, rateTier, resolveRateWindow, rateInfo, compactModelName,
   truncateBranch, resolveBranchMax, truncateMiddle, resolveFolderMax,
   fmtWindowSize, resolveModelMax, displayWidth, allocateNameCaps,
-  resolveWidthReserve, usableColumns, shouldCollapseNames,
+  resolveWidthReserve, usableColumns, shouldCollapseNames, resolveWorktree,
+  isLinkedWorktree,
 } from '../clepsydre.mjs';
 
 const GREEN = '\x1b[32m';
@@ -364,6 +365,36 @@ test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only
   assert.deepEqual(gitInfo('/repo', true, run), { branch: 'main', ahead: 0, behind: 0, dirty: 0 });
 });
 
+test('resolveWorktree: absent flag → enabled (on by default)', () => {
+  assert.equal(resolveWorktree({}), true);
+});
+
+test('resolveWorktree: explicit opt-out (0/false/no/off, any case) → disabled', () => {
+  for (const off of ['0', 'false', 'no', 'off', 'OFF']) {
+    assert.equal(resolveWorktree({ CLEPSYDRE_WORKTREE: off }), false);
+  }
+});
+
+test('isLinkedWorktree: git-dir differs from the common dir → a linked worktree', () => {
+  const run = () => '/repo/.git/worktrees/feature-x\n/repo/.git\n';
+  assert.equal(isLinkedWorktree('/repo-wt', run), true);
+});
+
+test('isLinkedWorktree: git-dir equals the common dir → the main checkout, not a worktree', () => {
+  const run = () => '/repo/.git\n/repo/.git\n';
+  assert.equal(isLinkedWorktree('/repo', run), false);
+});
+
+test('isLinkedWorktree: git fails (no repo, git absent, too old for --path-format) → false, never throws', () => {
+  const run = () => { throw new Error('fatal: not a git repository'); };
+  assert.equal(isLinkedWorktree('/tmp', run), false);
+});
+
+test('isLinkedWorktree: no dir from Claude Code → false (never probes the process cwd)', () => {
+  const run = () => '/elsewhere/.git/worktrees/x\n/elsewhere/.git\n';
+  assert.equal(isLinkedWorktree('', run), false);
+});
+
 test('fmtCountdown: hours and zero-padded minutes, compact (7980s → 2h13)', () => {
   assert.equal(fmtCountdown(7980), '2h13');
 });
@@ -687,6 +718,38 @@ test('end-to-end: inside a git repo the branch shows in the ⎇ segment', () => 
     env: { ...process.env, HOME: home, CLAUDE_CODE_AUTO_COMPACT_WINDOW: '' },
   });
   assert.match(out, /📁 [^⎇]+⎇ feature-x ·/);
+});
+
+// A real repo with one commit plus a linked worktree of it, for the worktree-marker end-to-end tests.
+function repoWithWorktree() {
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-repo-'));
+  const wt = `${work}-wt`;
+  const git = (...args) => execFileSync('git', ['-C', work, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { stdio: 'ignore' });
+  git('init', '-b', 'main');
+  git('commit', '--allow-empty', '-m', 'init');
+  git('worktree', 'add', '-b', 'feature-wt', wt);
+  return { work, wt };
+}
+
+function runScript(dir, extraEnv = {}) {
+  const script = fileURLToPath(new URL('../clepsydre.mjs', import.meta.url));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-home-'));
+  return execFileSync('node', [script], {
+    input: JSON.stringify({ model: { display_name: 'TestModel' }, workspace: { current_dir: dir } }),
+    encoding: 'utf8',
+    env: { ...process.env, HOME: home, ...extraEnv },
+  });
+}
+
+test('end-to-end: a linked git worktree shows 🌿, its main checkout keeps 📁', () => {
+  const { work, wt } = repoWithWorktree();
+  assert.match(runScript(wt), /\] 🌿 [^⎇]+⎇ feature-wt ·/);
+  assert.match(runScript(work), /\] 📁 [^⎇]+⎇ main ·/);
+});
+
+test('end-to-end: CLEPSYDRE_WORKTREE=0 keeps 📁 even in a linked worktree', () => {
+  const { wt } = repoWithWorktree();
+  assert.match(runScript(wt, { CLEPSYDRE_WORKTREE: '0' }), /\] 📁 [^⎇]+⎇ feature-wt ·/);
 });
 
 test('end-to-end: CLEPSYDRE_BRANCH_MAX clips a long branch (middle ellipsis); unset would show it full', () => {
@@ -1180,4 +1243,37 @@ test('buildStatusLine: outside a git repo, an extreme-narrow terminal collapses 
   assert.doesNotMatch(line, /my-huge-project/); // the folder text is gone (icon only)
   assert.doesNotMatch(line, /⎇/);              // no branch symbol when there's no repo
   assert.match(line, /MEMORY\.md/);            // tail preserved
+});
+
+test('buildStatusLine: in a linked worktree the folder icon is 🌿 instead of 📁', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'clepsydre-wt',
+    git: { branch: 'feature/x', ahead: 0, behind: 0, dirty: 0 },
+    used: 1000, max: 200000, mem: null, worktree: true,
+  });
+  assert.match(line, /\] 🌿 clepsydre-wt ⎇ feature\/x · /);
+  assert.doesNotMatch(line, /📁/);
+});
+
+test('buildStatusLine: the worktree marker survives the collapse to icons (🌿 ⎇ ±N)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', modelMax: '1M', effort: 'high',
+    basename: 'second-brain-generator',
+    git: { branch: 'test/rag-mutation-hardening', ahead: 0, behind: 0, dirty: 6 },
+    used: 90000, max: 300000,
+    mem: { mdBytes: 9100, dirBytes: 140000, fileCount: 40 },
+    rate: { pct: 42, resetIn: 5880 },
+    columns: 100, worktree: true,
+  });
+  assert.ok(line.includes(`🌿 ⎇ ${ORANGE}±6${RESET} · `));
+});
+
+test('buildStatusLine: without the worktree flag the folder icon stays 📁 (main checkout)', () => {
+  const line = buildStatusLine({
+    model: 'Opus 4.8', basename: 'clepsydre',
+    git: { branch: 'main', ahead: 0, behind: 0, dirty: 0 },
+    used: 1000, max: 200000, mem: null,
+  });
+  assert.match(line, /\] 📁 clepsydre ⎇ main · /);
+  assert.doesNotMatch(line, /🌿/);
 });
