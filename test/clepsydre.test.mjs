@@ -364,6 +364,22 @@ test('gitInfo: counts ON but the porcelain scan fails → degrade to branch-only
   assert.deepEqual(gitInfo('/repo', true, run), { branch: 'main', ahead: 0, behind: 0, dirty: 0 });
 });
 
+test('gitInfo: counts ON never rewrites the repo index (no .git/index.lock racing a concurrent commit)', () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'clepsydre-git-'));
+  const git = (...args) => execFileSync('git', ['-C', repo, ...args], { encoding: 'utf8' });
+  git('init', '-q');
+  const file = path.join(repo, 'tracked.txt');
+  fs.writeFileSync(file, 'x\n');
+  git('add', 'tracked.txt');
+  // Stale stat data on an unchanged file: a plain `git status` refreshes it and rewrites the index.
+  const later = new Date(Date.now() + 60_000);
+  fs.utimesSync(file, later, later);
+  const index = path.join(repo, '.git', 'index');
+  const before = fs.readFileSync(index);
+  gitInfo(repo, true);
+  assert.deepEqual(fs.readFileSync(index), before);
+});
+
 test('fmtCountdown: hours and zero-padded minutes, compact (7980s → 2h13)', () => {
   assert.equal(fmtCountdown(7980), '2h13');
 });

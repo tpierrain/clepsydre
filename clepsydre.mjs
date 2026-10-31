@@ -520,10 +520,12 @@ export function parseGitStatus(out) {
 
 const EMPTY_GIT = { branch: '', ahead: 0, behind: 0, dirty: 0 };
 
-// Run `git -C <dir> <args...>` and return its stdout. The default runner used in
+// Run `git --no-optional-locks -C <dir> <args...>` and return its stdout. The default runner used in
 // production; unit tests inject a fake to exercise gitInfo's branching without spawning.
+// --no-optional-locks: `status` must not refresh (rewrite) the index, which takes
+// .git/index.lock and makes a commit running at the same moment fail.
 function runGit(dir, args) {
-  return execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' });
+  return execFileSync('git', ['--no-optional-locks', '-C', dir, ...args], { encoding: 'utf8' });
 }
 
 // Current git state, gated by the `counts` opt-in (resolveGitCounts). Both paths return
